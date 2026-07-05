@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: local-file:; media-src 'self' local-file: data:;">
+  <title>Messenger</title>
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#eef1f5;color:#14171a}.app{height:100%;display:grid;grid-template-rows:auto 1fr auto;background:#fff}.top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #dfe3ea;background:#fff}.top h1{font-size:18px;margin:0}.actions,.composer,.tools{display:flex;gap:8px;align-items:center}button{border:0;border-radius:8px;background:#0a7cff;color:#fff;padding:9px 12px;cursor:pointer;font:inherit}button.secondary{background:#e7ebf0;color:#111}button.danger{background:#d92d20}button:active{transform:translateY(1px)}.messages{overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:#f7f8fa}.msg{align-self:flex-end;max-width:min(720px,88%);background:#0a7cff;color:#fff;border-radius:14px 14px 3px 14px;padding:10px 12px;box-shadow:0 1px 2px #0001}.msg .text{white-space:pre-wrap;overflow-wrap:anywhere}.msg time{display:block;font-size:11px;opacity:.8;margin-top:6px}.file{margin-top:8px;background:#fff;color:#111;border-radius:10px;padding:8px;min-width:220px}.file img,.file video{display:block;max-width:100%;max-height:360px;border-radius:8px}.file audio{width:280px;max-width:100%}.filebar{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px;font-size:12px}.filebar button{padding:5px 8px;font-size:12px}.composer{padding:12px;border-top:1px solid #dfe3ea;background:#fff}.composer input{flex:1;border:1px solid #ccd3dd;border-radius:10px;padding:11px 12px;font:inherit}.board{position:fixed;inset:18px;background:#fff;border:1px solid #ccd3dd;border-radius:12px;box-shadow:0 20px 70px #0004;display:grid;grid-template-rows:auto 1fr;z-index:3}.board[hidden]{display:none}.boardHead{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border-bottom:1px solid #dfe3ea}.board canvas{width:100%;height:100%;display:block;background:#fff;touch-action:none}.empty{margin:auto;color:#667085;text-align:center}@media(max-width:640px){.top,.composer{padding:10px}.messages{padding:10px}.board{inset:0;border-radius:0}.actions{gap:6px}button{padding:8px 10px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Messenger</h1>
+      <div class="actions">
+        <button id="openBoard" class="secondary" type="button">Whiteboard</button>
+        <button id="clearChat" class="danger" type="button">Clear</button>
+      </div>
+    </header>
+    <section id="messages" class="messages"></section>
+    <form id="composer" class="composer">
+      <button id="attach" class="secondary" type="button">File</button>
+      <input id="message" autocomplete="off" placeholder="Message yourself">
+      <button type="submit">Send</button>
+    </form>
+  </main>
+  <section id="board" class="board" hidden>
+    <div class="boardHead">
+      <strong>Whiteboard</strong>
+      <div class="tools">
+        <input id="color" type="color" value="#111111">
+        <input id="size" type="range" min="1" max="36" value="5">
+        <button id="clearBoard" class="secondary" type="button">Clear</button>
+        <button id="sendBoard" type="button">Send</button>
+        <button id="closeBoard" class="secondary" type="button">Close</button>
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+  </section>
+  <script src="renderer.js"></script>
+</body>
+</html>
