@@ -1,11 +1,16 @@
 ﻿const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("messenger", {
+contextBridge.exposeInMainWorld("api", {
   load: () => ipcRenderer.invoke("store:load"),
-  save: data => ipcRenderer.invoke("store:save", data),
+  save: d => ipcRenderer.invoke("store:save", d),
+  loadSettings: () => ipcRenderer.invoke("settings:load"),
+  saveSettings: d => ipcRenderer.invoke("settings:save", d),
   pickFiles: () => ipcRenderer.invoke("file:pick"),
-  saveCanvas: dataUrl => ipcRenderer.invoke("file:saveCanvas", dataUrl),
-  openFile: storedName => ipcRenderer.invoke("file:open", storedName),
-  revealFile: storedName => ipcRenderer.invoke("file:reveal", storedName),
-  fileUrl: storedName => `local-file:///${encodeURIComponent(storedName)}`
+  saveCanvas: d => ipcRenderer.invoke("file:saveCanvas", d),
+  openFile: n => ipcRenderer.invoke("file:open", n),
+  revealFile: n => ipcRenderer.invoke("file:reveal", n),
+  saveVoice: d => ipcRenderer.invoke("voice:save", d),
+  notify: o => ipcRenderer.invoke("notify:show", o),
+  setTheme: m => ipcRenderer.invoke("theme:set", m),
+  fileUrl: n => `local-file:///${encodeURIComponent(n)}`
 });

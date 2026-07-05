@@ -3,41 +3,229 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: local-file:; media-src 'self' local-file: data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: local-file:; media-src 'self' local-file: data: blob:;">
   <title>Messenger</title>
-  <style>
-    *{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#eef1f5;color:#14171a}.app{height:100%;display:grid;grid-template-rows:auto 1fr auto;background:#fff}.top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #dfe3ea;background:#fff}.top h1{font-size:18px;margin:0}.actions,.composer,.tools{display:flex;gap:8px;align-items:center}button{border:0;border-radius:8px;background:#0a7cff;color:#fff;padding:9px 12px;cursor:pointer;font:inherit}button.secondary{background:#e7ebf0;color:#111}button.danger{background:#d92d20}button:active{transform:translateY(1px)}.messages{overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:#f7f8fa}.msg{align-self:flex-end;max-width:min(720px,88%);background:#0a7cff;color:#fff;border-radius:14px 14px 3px 14px;padding:10px 12px;box-shadow:0 1px 2px #0001}.msg .text{white-space:pre-wrap;overflow-wrap:anywhere}.msg time{display:block;font-size:11px;opacity:.8;margin-top:6px}.file{margin-top:8px;background:#fff;color:#111;border-radius:10px;padding:8px;min-width:220px}.file img,.file video{display:block;max-width:100%;max-height:360px;border-radius:8px}.file audio{width:280px;max-width:100%}.filebar{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px;font-size:12px}.filebar button{padding:5px 8px;font-size:12px}.composer{padding:12px;border-top:1px solid #dfe3ea;background:#fff}.composer input{flex:1;border:1px solid #ccd3dd;border-radius:10px;padding:11px 12px;font:inherit}.board{position:fixed;inset:18px;background:#fff;border:1px solid #ccd3dd;border-radius:12px;box-shadow:0 20px 70px #0004;display:grid;grid-template-rows:auto 1fr;z-index:3}.board[hidden]{display:none}.boardHead{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border-bottom:1px solid #dfe3ea}.board canvas{width:100%;height:100%;display:block;background:#fff;touch-action:none}.empty{margin:auto;color:#667085;text-align:center}@media(max-width:640px){.top,.composer{padding:10px}.messages{padding:10px}.board{inset:0;border-radius:0}.actions{gap:6px}button{padding:8px 10px}}
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="app">
-    <header class="top">
-      <h1>Messenger</h1>
-      <div class="actions">
-        <button id="openBoard" class="secondary" type="button">Whiteboard</button>
-        <button id="clearChat" class="danger" type="button">Clear</button>
+  <div class="app">
+    <!-- Nav Rail -->
+    <nav class="rail">
+      <div class="rail-top">
+        <div class="avatar avatar-sm" id="myAvatar">Y</div>
       </div>
-    </header>
-    <section id="messages" class="messages"></section>
-    <form id="composer" class="composer">
-      <button id="attach" class="secondary" type="button">File</button>
-      <input id="message" autocomplete="off" placeholder="Message yourself">
-      <button type="submit">Send</button>
-    </form>
-  </main>
-  <section id="board" class="board" hidden>
-    <div class="boardHead">
-      <strong>Whiteboard</strong>
-      <div class="tools">
-        <input id="color" type="color" value="#111111">
-        <input id="size" type="range" min="1" max="36" value="5">
-        <button id="clearBoard" class="secondary" type="button">Clear</button>
-        <button id="sendBoard" type="button">Send</button>
-        <button id="closeBoard" class="secondary" type="button">Close</button>
+      <div class="rail-nav">
+        <button class="rail-btn active" data-view="chat" title="Chats">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        </button>
+      </div>
+      <div class="rail-bottom">
+        <button class="rail-btn" id="btnDarkToggle" title="Dark Mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+        <button class="rail-btn" id="btnSettings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>You</h2>
+        <div class="sidebar-actions">
+          <button class="icon-btn" id="btnNewChat" title="New Chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="sidebarSearch" placeholder="Search Messenger">
+      </div>
+      <div class="conv-list" id="convList"></div>
+    </aside>
+
+    <!-- Chat Panel -->
+    <section class="chat" id="chatPanel">
+      <div class="chat-header" id="chatHeader">
+        <div class="chat-header-info">
+          <div class="avatar avatar-md av-0">Y</div>
+          <div class="chat-header-text">
+            <div class="chat-name">You</div>
+            <div class="chat-status"><span class="status-dot"></span>Active now</div>
+          </div>
+        </div>
+        <div class="chat-header-actions">
+          <button class="icon-btn" id="btnSearchMsgs" title="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </button>
+          <button class="icon-btn" id="btnThemePicker" title="Theme">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 000 20 4 4 0 004-4V6a4 4 0 00-4-4z"/></svg>
+          </button>
+          <button class="icon-btn" id="btnWhiteboard" title="Whiteboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="pinned-bar" id="pinnedBar" hidden>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+        <span id="pinnedText"></span>
+        <button class="icon-btn icon-btn-sm" id="btnUnpin">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="search-bar" id="searchBar" hidden>
+        <input type="text" id="msgSearchInput" placeholder="Search in conversation...">
+        <span class="search-count" id="searchCount"></span>
+        <button class="icon-btn icon-btn-sm" id="btnPrevSearch"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button>
+        <button class="icon-btn icon-btn-sm" id="btnNextSearch"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="icon-btn icon-btn-sm" id="btnCloseSearch"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          </div>
+          <div class="empty-title">Your Notes</div>
+          <p>Send messages, files, and drawings to yourself</p>
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typingIndicator" hidden>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      </div>
+
+      <div class="dropzone" id="dropzone" hidden>
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Drop files here</span>
+      </div>
+
+      <div class="composer" id="composer">
+        <button class="composer-btn" id="btnAttach" title="Attach">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <button class="composer-btn" id="btnEmoji" title="Emoji">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </button>
+        <input class="composer-input" id="messageInput" type="text" placeholder="Message yourself" autocomplete="off">
+        <button class="composer-btn" id="btnVoice" title="Voice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <button class="composer-send" id="btnSend" title="Send">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Overlays -->
+    <div class="emoji-picker" id="emojiPicker" hidden>
+      <input class="emoji-search" id="emojiSearch" type="text" placeholder="Search emoji...">
+      <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+
+    <div class="theme-picker" id="themePicker" hidden>
+      <div class="theme-picker-title">Chat Theme</div>
+      <div class="theme-colors" id="themeColors">
+        <button class="theme-dot" data-theme="blue" style="background:linear-gradient(135deg,#0084ff,#0066e0)"></button>
+        <button class="theme-dot" data-theme="purple" style="background:linear-gradient(135deg,#a855f7,#7c3aed)"></button>
+        <button class="theme-dot" data-theme="pink" style="background:linear-gradient(135deg,#ec4899,#db2777)"></button>
+        <button class="theme-dot" data-theme="green" style="background:linear-gradient(135deg,#22c55e,#16a34a)"></button>
+        <button class="theme-dot" data-theme="orange" style="background:linear-gradient(135deg,#f97316,#ea580c)"></button>
+        <button class="theme-dot" data-theme="red" style="background:linear-gradient(135deg,#ef4444,#dc2626)"></button>
+        <button class="theme-dot" data-theme="teal" style="background:linear-gradient(135deg,#14b8a6,#0d9488)"></button>
+        <button class="theme-dot" data-theme="gradient" style="background:linear-gradient(135deg,#667eea,#764ba2)"></button>
       </div>
     </div>
-    <canvas id="canvas"></canvas>
-  </section>
+
+    <div class="settings-panel" id="settingsPanel" hidden>
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="icon-btn" id="btnCloseSettings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-group">
+          <label class="settings-label">Appearance</label>
+          <div class="settings-row">
+            <span>Dark Mode</span>
+            <label class="toggle"><input type="checkbox" id="settingDarkMode"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Data</label>
+          <button class="btn-danger" id="btnClearAll">Clear All Messages</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="ctx-menu" id="ctxMenu" hidden>
+      <li data-action="react">React</li>
+      <li data-action="reply">Reply</li>
+      <li data-action="copy">Copy</li>
+      <li data-action="pin">Pin</li>
+      <li data-action="edit">Edit</li>
+      <li data-action="delete">Delete</li>
+    </ul>
+
+    <div class="reaction-picker" id="reactionPicker" hidden>
+      <button class="reaction-btn" data-emoji="&#x1F44D;">&#x1F44D;</button>
+      <button class="reaction-btn" data-emoji="&#x2764;&#xFE0F;">&#x2764;&#xFE0F;</button>
+      <button class="reaction-btn" data-emoji="&#x1F602;">&#x1F602;</button>
+      <button class="reaction-btn" data-emoji="&#x1F62E;">&#x1F62E;</button>
+      <button class="reaction-btn" data-emoji="&#x1F622;">&#x1F622;</button>
+      <button class="reaction-btn" data-emoji="&#x1F525;">&#x1F525;</button>
+    </div>
+
+    <div class="modal-overlay" id="editModal" hidden>
+      <div class="modal">
+        <div class="modal-header">Edit Message</div>
+        <textarea class="modal-input" id="editInput"></textarea>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="btnCancelEdit">Cancel</button>
+          <button class="btn-primary" id="btnSaveEdit">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas Panel (outside .app for fullscreen overlay) -->
+  <div class="canvas-panel" id="canvasPanel">
+    <div class="canvas-header">
+      <div class="canvas-title-group">
+        <h3>Whiteboard</h3>
+        <div class="canvas-status"><div class="status-dot green"></div><span id="toolName">Pen</span></div>
+      </div>
+      <div class="canvas-tools">
+        <button class="tool-btn active" data-tool="pen" title="Pen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="eraser" title="Eraser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l9-9 8 8-4 4z"/></svg>
+        </button>
+        <div class="canvas-divider"></div>
+        <div class="color-wrap"><input type="color" id="colorPicker" value="#111111"></div>
+        <div class="size-wrap">
+          <input type="range" id="sizeSlider" min="1" max="36" value="5">
+          <span class="size-label" id="sizeLabel">5</span>
+        </div>
+        <div class="canvas-divider"></div>
+        <button class="tool-btn danger" id="btnClearCanvas" title="Clear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+        <button class="btn-secondary" id="btnCancelCanvas">Cancel</button>
+        <button class="btn-primary" id="btnSendCanvas">Send</button>
+      </div>
+    </div>
+    <div class="canvas-container"><canvas id="canvasBoard"></canvas></div>
+    <div class="canvas-footer">
+      <span>Strokes: <strong id="strokeCount">0</strong></span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
   <script src="renderer.js"></script>
 </body>
 </html>

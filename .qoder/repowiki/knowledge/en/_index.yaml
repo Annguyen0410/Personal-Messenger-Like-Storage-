@@ -1,0 +1,26 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-07-05T21:31:51Z"
+modules:
+    "":
+        dir_name: Messenger Self-Chat — Electron Desktop Notebook
+        title: Messenger Self-Chat — Electron Desktop Notebook
+        scope:
+            - README.md
+            - TODO.md
+            - .gitignore
+            - package.json
+            - package-lock.json
+            - app.js
+            - index.html
+            - main.js
+            - preload.js
+            - renderer.js
+            - styles.css
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

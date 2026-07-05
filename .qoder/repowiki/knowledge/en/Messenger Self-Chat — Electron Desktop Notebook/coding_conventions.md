@@ -1,0 +1,5 @@
+- IPC channels are namespaced with a colon prefix `<domain>:<action>` (e.g. `store:load`, `file:pick`, `voice:save`) and handled exclusively via `ipcMain.handle` returning promises.
+- Renderer-side DOM access goes through a tiny `$ = id => document.getElementById(id)` helper and a prebuilt `els` map of IDs to elements, rather than repeated `document.querySelector` calls.
+- Every user-visible string is passed through `escapeText` before being injected as HTML, and file content is never written directly from the renderer — all disk I/O is funneled through `window.messenger` IPC handles.
+- File metadata objects follow the `{ name, storedName, size, mime, category }` shape, with `category` derived from MIME type (`image|video|audio|pdf|file`) and used to drive conditional rendering branches.
+- State mutations are followed by an immediate `render(false)` (no scroll-to-bottom) plus an awaited `save()` call, keeping the in-memory model and persisted `messages.json` in sync.
