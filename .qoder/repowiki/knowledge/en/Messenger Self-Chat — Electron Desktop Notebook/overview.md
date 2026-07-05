@@ -1,1 +1,1 @@
-Electron desktop app that looks like Facebook Messenger but is a private, offline self-chat notebook with file attachments, voice notes, whiteboard, and local JSON persistence.
+Electron desktop self-chat notebook styled like Facebook Messenger, supporting text, file attachments, voice notes, a Canvas whiteboard, and local JSON persistence.

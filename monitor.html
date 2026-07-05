@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src https://earthquake.usgs.gov https://*.basemaps.cartocdn.com;">
+  <title>World Monitor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="monitor.css">
+</head>
+<body>
+  <!-- Fallback: visible even if JS fails -->
+  <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);color:#00ff88;font:bold 20px monospace;z-index:9999">WORLD MONITOR</div>
+
+  <div id="map"></div>
+
+  <button class="close-btn" id="closeBtn" title="Close (ESC)">&#x2715;</button>
+
+  <div class="header">
+    <span class="header-title">WORLD MONITOR</span>
+    <span class="header-live"><span class="live-dot"></span>LIVE</span>
+    <span class="header-clock" id="clock">--:--:-- UTC</span>
+    <span class="header-time" id="updateTime"></span>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value">Loading...</span></div>
+  </div>
+
+  <div class="threat-panel" id="threatPanel">
+    <div class="threat-header">THREAT LOG</div>
+    <div class="threat-body" id="threatLog"></div>
+  </div>
+
+  <div class="news-ticker-wrap">
+    <span class="news-label">BREAKING</span>
+    <div class="news-ticker"><div class="news-track" id="newsTrack"></div></div>
+  </div>
+
+  <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="monitor.js"></script>
+</body>
+</html>

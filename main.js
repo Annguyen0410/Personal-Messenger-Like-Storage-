@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme, net } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -12,6 +12,7 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); }
 
 let win = null;
+let monitorWin = null;
 const DATA = () => path.join(app.getPath("userData"), "messages.json");
 const SETTINGS = () => path.join(app.getPath("userData"), "settings.json");
 const FDIR = () => path.join(app.getPath("userData"), "files");
@@ -113,6 +114,42 @@ function registerHandlers() {
   });
 
   ipcMain.handle("theme:set", (_, mode) => { nativeTheme.themeSource = mode; });
+
+  /* World Monitor IPC */
+  ipcMain.handle("monitor:quakes", async () => {
+    try {
+      const resp = await net.fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch { return null; }
+  });
+
+  ipcMain.on("monitor:open", () => {
+    console.log("[Main] monitor:open received");
+    if (monitorWin) { console.log("[Main] monitor already open, focusing"); monitorWin.focus(); return; }
+    const monitorPath = path.join(__dirname, "monitor.html");
+    console.log("[Main] creating monitor, loading:", monitorPath);
+    try {
+      monitorWin = new BrowserWindow({
+        frame: false, fullscreen: true,
+        backgroundColor: "#0a0a0a",
+        webPreferences: {
+          preload: path.join(__dirname, "monitor-preload.js"),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: false
+        }
+      });
+      monitorWin.loadFile(monitorPath);
+      monitorWin.webContents.openDevTools({ mode: "detach" });
+      monitorWin.on("closed", () => { console.log("[Main] monitor closed"); monitorWin = null; });
+      console.log("[Main] monitor window created successfully");
+    } catch (err) {
+      console.error("[Main] monitor creation failed:", err);
+    }
+  });
+
+  ipcMain.on("monitor:close", () => { if (monitorWin) monitorWin.close(); });
 }
 
 function createWindow() {

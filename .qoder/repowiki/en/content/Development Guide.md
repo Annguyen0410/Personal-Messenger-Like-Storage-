@@ -13,56 +13,74 @@
 - [TODO.md](file://TODO.md)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated project structure documentation to reflect the new three-panel architecture
+- Enhanced security practices section with improved context isolation patterns
+- Added centralized path management documentation
+- Updated build configuration details for enhanced electron-builder setup
+- Revised development workflow with new architectural patterns
+- Added comprehensive debugging techniques for the enhanced architecture
+- Updated coding conventions for the new API surface
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Security Architecture](#security-architecture)
+7. [Development Workflow](#development-workflow)
+8. [Build and Distribution](#build-and-distribution)
+9. [Testing Approaches](#testing-approaches)
+10. [Coding Conventions](#coding-conventions)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
+13. [Appendices](#appendices)
 
 ## Introduction
-This guide provides comprehensive development documentation for contributing to the Messenger project, an Electron desktop application that offers a private, self-chat notebook with rich file attachments and a whiteboard feature. It explains the project structure, development workflow (setup, run, debug), build and distribution using electron-builder, testing approaches, code organization patterns, guidelines for adding features, coding conventions, backward compatibility considerations, deployment across platforms, and troubleshooting steps.
+This guide provides comprehensive development documentation for contributing to the Messenger project, an Electron desktop application featuring a private self-chat notebook with rich file attachments, whiteboard functionality, and a modern three-panel interface. The application emphasizes security through strict context isolation, secure IPC communication, and centralized path management. It explains the enhanced project structure, development workflow, build processes, testing approaches, and architectural patterns established in this major redesign.
 
 ## Project Structure
-The repository is organized as a flat Electron app with clear separation between main process, preload bridge, renderer UI, and assets:
+The repository follows a refined Electron architecture with clear separation between main process, secure preload bridge, renderer UI components, and comprehensive styling:
 
-- Main process:
-  - main.js: Application lifecycle, window creation, IPC handlers, secure file serving via custom protocol, settings persistence, single-instance lock.
-- Preload bridge:
-  - preload.js: Exposes a safe API surface to the renderer via contextBridge.
-- Renderer:
-  - index.html: UI markup and CSP configuration.
-  - renderer.js: Primary UI logic for chat, attachments, reactions, search, voice notes, canvas/whiteboard, theme/dark mode, and settings.
-  - app.js: A secondary or legacy renderer implementation containing a simpler chat + canvas flow.
-  - styles.css: Comprehensive styling including themes, dark mode, responsive layout, and component styles.
-- Configuration and metadata:
-  - package.json: App metadata, scripts, electron-builder configuration, dev dependencies, engines.
-  - README.md: User-facing overview and quick start.
-  - TODO.md: Feature cleanup and verification tasks.
+### Main Process Layer
+- **main.js**: Application lifecycle management, secure window creation, IPC handler registration, custom protocol implementation, centralized path management, and single-instance locking
+
+### Secure Bridge Layer  
+- **preload.js**: Minimal API surface exposed via contextBridge, providing secure access to main process capabilities
+
+### Renderer Layer
+- **index.html**: Three-panel UI markup with CSP configuration, canvas overlay system, and responsive design elements
+- **renderer.js**: Primary UI logic implementing message management, file attachments, reactions, search, voice notes, canvas/whiteboard, theme system, and settings
+- **app.js**: Legacy renderer implementation providing simplified chat and canvas flow for backward compatibility
+
+### Styling and Assets
+- **styles.css**: Comprehensive CSS architecture with CSS variables for theming, dark mode support, responsive breakpoints, and component-specific styles
+
+### Configuration and Documentation
+- **package.json**: Enhanced build configuration with electron-builder targets, platform-specific options, and development scripts
+- **README.md**: User-facing documentation covering features, installation, and usage
+- **TODO.md**: Feature development tracking and verification tasks
 
 ```mermaid
 graph TB
 subgraph "Main Process"
-M["main.js"]
+M["main.js<br/>Lifecycle & IPC"]
 end
-subgraph "Preload Bridge"
-P["preload.js"]
+subgraph "Secure Bridge"
+P["preload.js<br/>contextBridge API"]
 end
-subgraph "Renderer"
-H["index.html"]
-R["renderer.js"]
-A["app.js"]
-S["styles.css"]
+subgraph "Renderer Layer"
+H["index.html<br/>Three-panel UI"]
+R["renderer.js<br/>Primary Logic"]
+A["app.js<br/>Legacy Support"]
+S["styles.css<br/>Theming & Layout"]
 end
-subgraph "Config"
-PKG["package.json"]
-RDME["README.md"]
-TODO["TODO.md"]
+subgraph "Configuration"
+PKG["package.json<br/>Build Config"]
+RDME["README.md<br/>User Docs"]
+TODO["TODO.md<br/>Tasks"]
 end
 PKG --> M
 PKG --> H
@@ -76,107 +94,156 @@ A --> P
 
 **Diagram sources**
 - [package.json:1-56](file://package.json#L1-L56)
-- [main.js:1-176](file://main.js#L1-L176)
+- [main.js:1-155](file://main.js#L1-L155)
 - [preload.js:1-17](file://preload.js#L1-L17)
-- [index.html:1-303](file://index.html#L1-L303)
-- [renderer.js:1-895](file://renderer.js#L1-L895)
+- [index.html:1-232](file://index.html#L1-L232)
+- [renderer.js:1-723](file://renderer.js#L1-L723)
 - [app.js:1-239](file://app.js#L1-L239)
-- [styles.css:1-800](file://styles.css#L1-L800)
-- [README.md:1-79](file://README.md#L1-L79)
-- [TODO.md:1-18](file://TODO.md#L1-L18)
+- [styles.css:1-293](file://styles.css#L1-L293)
 
 **Section sources**
 - [package.json:1-56](file://package.json#L1-L56)
 - [README.md:1-79](file://README.md#L1-L79)
 
 ## Core Components
-- Main process (main.js):
-  - Registers a secure custom protocol for local files.
-  - Ensures directories exist for files and voice recordings.
-  - Persists messages and settings to JSON files under userData.
-  - Handles IPC for store load/save, settings load/save, file pick/save/open/reveal, voice save, notifications, and theme changes.
-  - Creates the BrowserWindow with strict security preferences (contextIsolation true, nodeIntegration false).
-- Preload bridge (preload.js):
-  - Exposes a minimal, typed API to the renderer: load/save data, load/save settings, pick files, save canvas image, open/reveal files, save voice note, show notification, set theme, and generate safe file URLs.
-- Renderer (renderer.js):
-  - Implements the full UI state machine: message list rendering, attachment previews, reactions, pinning, editing, search, emoji picker, theme/dark mode toggles, settings panel, voice recording, drag-and-drop, and canvas/whiteboard integration.
-  - Uses the exposed API to persist data and interact with the OS safely.
-- Secondary renderer (app.js):
-  - Provides a simplified chat and canvas flow; may be used for alternate views or legacy support.
-- Styles (styles.css):
-  - Defines CSS variables for theming, dark mode, layout, components, animations, and responsive breakpoints.
-- Configuration (package.json):
-  - Defines npm scripts for development and building, electron-builder targets, and platform-specific packaging options.
+
+### Main Process (main.js)
+The main process serves as the application's core controller with enhanced security and path management:
+
+**Key Responsibilities:**
+- Custom protocol registration for secure local file serving (`local-file://`)
+- Centralized path management using helper functions for consistent directory access
+- JSON persistence for messages and settings with graceful error handling
+- Comprehensive IPC handler registration for all renderer-to-main communication
+- Single-instance lock implementation to prevent multiple app instances
+- BrowserWindow creation with strict security preferences
+
+**Security Enhancements:**
+- Context isolation enabled with nodeIntegration disabled
+- Safe path validation preventing directory traversal attacks
+- Custom protocol restricting access to allowed directories only
+- Stream-based file serving to prevent memory issues with large files
+
+### Preload Bridge (preload.js)
+The secure bridge exposes a minimal, typed API surface to the renderer:
+
+**Exposed API Methods:**
+- Data management: `load()`, `save()`, `loadSettings()`, `saveSettings()`
+- File operations: `pickFiles()`, `saveCanvas()`, `openFile()`, `revealFile()`
+- Media handling: `saveVoice()` for audio recordings
+- System integration: `showNotification()`, `setTheme()`
+- URL generation: `fileUrl(storedName)` returns safe local-file URLs
+
+**Security Design:**
+- Enforces least privilege principle by exposing only necessary methods
+- Centralizes all IPC calls through a single entry point
+- Prevents direct Node.js access from renderer context
+
+### Renderer (renderer.js)
+The primary renderer implements the complete three-panel interface with advanced features:
+
+**State Management:**
+- Centralized state object for messages and settings
+- Automatic persistence after mutations
+- Theme and appearance state management
+
+**UI Features:**
+- Three-panel layout (navigation rail, conversation sidebar, chat panel)
+- Message rendering with day dividers, reactions, and read receipts
+- File attachment previews for images, videos, audio, and documents
+- Advanced search with highlighting and navigation
+- Voice recording with real-time feedback
+- Canvas/whiteboard with drawing tools and eraser functionality
+- Emoji picker with search capabilities
+- Settings panel with dark mode and theme customization
+
+**Interaction Patterns:**
+- Event-driven DOM manipulation with helper utilities
+- Drag-and-drop file support with visual feedback
+- Context menus for message actions
+- Keyboard shortcuts for common operations
+
+### Secondary Renderer (app.js)
+Provides a simplified chat and canvas flow for legacy compatibility:
+- Basic message persistence and rendering
+- Simplified file attachment handling
+- Canvas drawing functionality
+- Uses the same secure API surface as the main renderer
+
+### Styles (styles.css)
+Comprehensive styling system supporting the three-panel architecture:
+- CSS custom properties for theming and dark mode
+- Responsive design with mobile-first approach
+- Component-specific styles for bubbles, attachments, modals
+- Animation definitions for smooth transitions
+- Dark mode color schemes and theme variations
 
 **Section sources**
-- [main.js:1-176](file://main.js#L1-L176)
+- [main.js:1-155](file://main.js#L1-L155)
 - [preload.js:1-17](file://preload.js#L1-L17)
-- [renderer.js:1-895](file://renderer.js#L1-L895)
+- [renderer.js:1-723](file://renderer.js#L1-L723)
 - [app.js:1-239](file://app.js#L1-L239)
-- [styles.css:1-800](file://styles.css#L1-L800)
-- [package.json:1-56](file://package.json#L1-L56)
+- [styles.css:1-293](file://styles.css#L1-L293)
 
 ## Architecture Overview
-The app follows a standard Electron architecture with strict security boundaries:
-
-- The main process owns filesystem access and native APIs.
-- The renderer runs in isolation without Node integration and communicates through a preloaded bridge.
-- A custom protocol serves stored files securely to the renderer.
+The application follows a secure Electron architecture with strict boundaries between processes:
 
 ```mermaid
 sequenceDiagram
 participant Dev as "Developer"
-participant NPM as "npm scripts"
+participant NPM as "npm Scripts"
 participant Main as "main.js"
 participant Win as "BrowserWindow"
 participant HTML as "index.html"
 participant Render as "renderer.js"
 participant Preload as "preload.js"
 participant FS as "Filesystem"
-Dev->>NPM : "npm start"
-NPM->>Main : "electron ."
+Dev->>NPM : npm start
+NPM->>Main : electron .
 Main->>FS : ensureDirs()
 Main->>Win : createWindow()
 Win->>HTML : loadFile("index.html")
 HTML->>Render : script src="renderer.js"
-Render->>Preload : window.messenger.load()
+Render->>Preload : window.api.load()
 Preload->>Main : ipcRenderer.invoke("store : load")
 Main-->>Preload : {messages,...}
 Preload-->>Render : data
 Render->>Render : render()
-Render->>Preload : window.messenger.save(data)
-Preload->>Main : ipcRenderer.invoke("store : save", data)
+Render->>Preload : window.api.save(state)
+Preload->>Main : ipcRenderer.invoke("store : save", state)
 Main->>FS : writeFileSync(messages.json)
 ```
 
 **Diagram sources**
 - [package.json:6-11](file://package.json#L6-L11)
-- [main.js:103-121](file://main.js#L103-L121)
-- [main.js:123-126](file://main.js#L123-L126)
+- [main.js:135-150](file://main.js#L135-L150)
 - [preload.js:3-16](file://preload.js#L3-L16)
-- [index.html:257-258](file://index.html#L257-L258)
-- [renderer.js:7-15](file://renderer.js#L7-L15)
+- [index.html:229](file://index.html#L229)
+- [renderer.js:705-718](file://renderer.js#L705-L718)
 
 ## Detailed Component Analysis
 
-### Main Process (main.js)
-Responsibilities:
-- Single-instance lock and app lifecycle events.
-- Custom protocol registration for secure file serving.
-- Directory initialization for files and voice recordings.
-- JSON persistence for messages and settings.
-- IPC handlers for store, settings, file operations, voice, notifications, and theme.
+### Main Process Architecture
+The main process implements a robust foundation with enhanced security and path management:
 
-Key flows:
-- Store I/O: readJson/writeJson handle messages.json with graceful fallbacks.
-- Settings I/O: readSettings/writeSettings manage user preferences like dark mode and theme.
-- File handling: safeStoredPath validates paths; mimeFor maps extensions to MIME types; categoryFor classifies media.
-- Protocol handler: local-file scheme streams files back to the renderer with correct headers.
+**Path Management Functions:**
+- `DATA()`: Returns path to messages.json in userData directory
+- `SETTINGS()`: Returns path to settings.json configuration
+- `FDIR()`: Returns path to files storage directory
+- `VDIR()`: Returns path to voice recordings directory
 
-Security:
-- contextIsolation enabled, nodeIntegration disabled.
-- Safe path validation prevents directory traversal.
-- Custom protocol restricts access to allowed directories.
+**Security Implementation:**
+- Custom protocol registration with strict privileges
+- Safe file path validation preventing directory traversal
+- MIME type mapping for proper content handling
+- Category classification for media types
+
+**IPC Handler Organization:**
+- Store operations: load/save messages with error handling
+- Settings management: persistent user preferences
+- File operations: secure file picking and saving
+- Voice recording: WebM format with base64 encoding
+- System integration: notifications and theme control
 
 ```mermaid
 flowchart TD
@@ -199,262 +266,321 @@ IPCHandlers --> ThemeSet["theme:set -> nativeTheme.themeSource"]
 ```
 
 **Diagram sources**
-- [main.js:11-23](file://main.js#L11-L23)
-- [main.js:25-51](file://main.js#L25-L51)
-- [main.js:53-89](file://main.js#L53-L89)
-- [main.js:91-101](file://main.js#L91-L101)
-- [main.js:103-121](file://main.js#L103-L121)
-- [main.js:123-166](file://main.js#L123-L166)
+- [main.js:135-150](file://main.js#L135-L150)
+- [main.js:63-116](file://main.js#L63-L116)
 
 **Section sources**
-- [main.js:1-176](file://main.js#L1-L176)
+- [main.js:1-155](file://main.js#L1-155)
 
-### Preload Bridge (preload.js)
-Exposes a minimal API surface to the renderer:
-- Data: load, save, loadSettings, saveSettings
-- Files: pickFiles, saveCanvas, openFile, revealFile
-- Media: saveVoice
-- System: showNotification, setTheme
-- URL builder: fileUrl(storedName) returns a safe local-file URL
+### Preload Bridge Security Model
+The preload bridge enforces a secure communication pattern:
 
-This design enforces least privilege and centralizes IPC calls.
+**API Surface Design:**
+- Minimal method exposure following least privilege principle
+- Type-safe IPC communication through invoke handlers
+- Centralized error handling and response formatting
+- Safe URL generation for local file access
+
+**Security Boundaries:**
+- Context isolation prevents direct Node.js access
+- No global variable pollution
+- Strict input validation on all IPC calls
+- Secure file path construction and validation
 
 **Section sources**
 - [preload.js:1-17](file://preload.js#L1-L17)
 
-### Renderer (renderer.js)
-Primary responsibilities:
-- State management: loads messages and settings on startup.
-- Rendering: builds message rows, day dividers, attachment previews, reactions, pinned bar, read receipts, edit modal, search highlights.
-- Interactions: composer submit, attach files, drag-and-drop, emoji picker, theme picker, settings panel, voice recording, canvas/whiteboard.
-- Persistence: saves state after mutations.
-- Notifications: shows system notifications on send.
+### Renderer State Management
+The renderer implements comprehensive state management for the three-panel interface:
 
-Notable patterns:
-- Event-driven DOM manipulation with helper functions for escaping text and formatting time/size.
-- Centralized save() wrapper around api.save(state).
-- Search indexing and highlighting within rendered messages.
-- Canvas drawing with pointer capture and DPR-aware resizing.
+**State Structure:**
+- Messages array with metadata (timestamps, reactions, pinning)
+- Settings object for appearance and preferences
+- UI state for modals, menus, and interaction modes
+- Drawing state for canvas functionality
 
-```mermaid
-sequenceDiagram
-participant UI as "renderer.js"
-participant API as "window.messenger"
-participant Main as "main.js"
-participant FS as "Filesystem"
-UI->>API : load()
-API->>Main : "store : load"
-Main-->>API : {messages,...}
-API-->>UI : data
-UI->>UI : render()
-UI->>API : save(state)
-API->>Main : "store : save"
-Main->>FS : writeFileSync(messages.json)
-UI->>API : pickFiles()
-API->>Main : "file : pick"
-Main-->>API : [{name,storedName,size,mime,category}]
-API-->>UI : files
-UI->>UI : addMessage(text, files)
-UI->>API : saveCanvas(dataURL)
-API->>Main : "file : saveCanvas"
-Main->>FS : write PNG
-Main-->>API : {storedName,...}
-API-->>UI : file
-```
+**Rendering Pipeline:**
+- Efficient DOM updates with selective re-rendering
+- Search highlighting with regex-based text matching
+- Attachment preview generation based on MIME types
+- Real-time updates for voice recording and typing indicators
 
-**Diagram sources**
-- [renderer.js:7-15](file://renderer.js#L7-L15)
-- [renderer.js:357-368](file://renderer.js#L357-L368)
-- [renderer.js:542-549](file://renderer.js#L542-L549)
-- [renderer.js:633-637](file://renderer.js#L633-L637)
-- [preload.js:3-16](file://preload.js#L3-L16)
-- [main.js:123-141](file://main.js#L123-L141)
+**Event Handling:**
+- Delegated event listeners for dynamic content
+- Pointer capture for smooth canvas drawing
+- Keyboard shortcuts for accessibility
+- Drag-and-drop with visual feedback
 
 **Section sources**
-- [renderer.js:1-895](file://renderer.js#L1-L895)
+- [renderer.js:1-723](file://renderer.js#L1-723)
 
-### Secondary Renderer (app.js)
-Provides a simpler chat and canvas flow:
-- Loads/saves messages.
-- Renders messages and file attachments.
-- Opens/closes a canvas overlay for drawing and sending images.
-- Uses the same preload API for persistence and file saving.
+### Three-Panel UI Architecture
+The interface follows a modern three-panel layout pattern:
 
-Use this module if you need a minimal view or are refactoring toward a unified renderer.
+**Navigation Rail (Left):**
+- Compact icon-based navigation
+- Dark theme background
+- Quick access to settings and theme controls
 
-**Section sources**
-- [app.js:1-239](file://app.js#L1-L239)
+**Conversation Sidebar (Middle):**
+- Searchable conversation list
+- Preview text and timestamps
+- Active conversation highlighting
 
-### Styles (styles.css)
-Defines:
-- CSS variables for light/dark themes and color accents.
-- Layout for rail, sidebar, chat panel, composer, and overlays.
-- Component styles for bubbles, attachments, reactions, modals, and canvas tools.
-- Responsive rules for mobile and tablet widths.
-
-When adding new UI elements, follow existing variable usage and class naming conventions to maintain consistency.
+**Chat Panel (Right):**
+- Message display with day dividers
+- Rich attachment previews
+- Composer with multiple input methods
+- Floating overlays for tools and menus
 
 **Section sources**
-- [styles.css:1-800](file://styles.css#L1-L800)
+- [index.html:11-232](file://index.html#L11-L232)
+- [styles.css:31-293](file://styles.css#L31-L293)
 
-### Configuration (package.json)
-Scripts:
-- start/dev: Launches Electron.
-- build/dist: Runs electron-builder.
+## Security Architecture
+The application implements multiple layers of security to protect user data and system integrity:
 
-Build configuration:
-- appId, productName, files inclusion, directories.buildResources.
-- Windows NSIS installer options (oneClick=false, allowToChangeInstallationDirectory=true, shortcuts).
-- Targets include nsis and portable.
+### Context Isolation
+- `contextIsolation: true` prevents renderer access to Node.js APIs
+- `nodeIntegration: false` disables direct Node.js execution in renderer
+- `sandbox: false` allows necessary browser APIs while maintaining security
 
-Dev dependencies:
-- electron and electron-builder.
+### Secure IPC Communication
+- All renderer-to-main communication goes through preloaded bridge
+- Input validation on all IPC handler parameters
+- Error handling prevents information leakage
+- Response sanitization before returning to renderer
 
-Engines:
-- Requires Node >= 18.
+### File System Security
+- Custom `local-file://` protocol restricts file access
+- Path normalization prevents directory traversal attacks
+- MIME type validation for proper content handling
+- UUID-based file naming prevents filename conflicts
 
-**Section sources**
-- [package.json:1-56](file://package.json#L1-L56)
-
-## Dependency Analysis
-High-level dependency relationships:
-- package.json orchestrates scripts and build tooling.
-- main.js depends on Electron modules and Node fs/path/crypto/stream.
-- preload.js bridges IPC between renderer and main.
-- renderer.js and app.js depend on the exposed window.messenger API.
-- index.html includes renderer scripts and styles.
-
-```mermaid
-graph LR
-PKG["package.json"] --> MAIN["main.js"]
-PKG --> HTML["index.html"]
-MAIN --> PRELOAD["preload.js"]
-HTML --> RENDER["renderer.js"]
-HTML --> APPJS["app.js"]
-HTML --> STYLES["styles.css"]
-RENDER --> PRELOAD
-APPJS --> PRELOAD
-```
-
-**Diagram sources**
-- [package.json:1-56](file://package.json#L1-L56)
-- [main.js:1-176](file://main.js#L1-L176)
-- [preload.js:1-17](file://preload.js#L1-L17)
-- [index.html:1-303](file://index.html#L1-L303)
-- [renderer.js:1-895](file://renderer.js#L1-L895)
-- [app.js:1-239](file://app.js#L1-L239)
-- [styles.css:1-800](file://styles.css#L1-L800)
-
-**Section sources**
-- [package.json:1-56](file://package.json#L1-L56)
-- [main.js:1-176](file://main.js#L1-L176)
-- [preload.js:1-17](file://preload.js#L1-L17)
-- [index.html:1-303](file://index.html#L1-L303)
-- [renderer.js:1-895](file://renderer.js#L1-L895)
-- [app.js:1-239](file://app.js#L1-L239)
-- [styles.css:1-800](file://styles.css#L1-L800)
-
-## Performance Considerations
-- Avoid large synchronous operations in the renderer; delegate heavy work to the main process via IPC where possible.
-- Use streaming for large file responses via the custom protocol to prevent memory spikes.
-- Debounce frequent UI updates (e.g., typing indicator, search input) to reduce reflows.
-- Limit DOM manipulations by batching updates and minimizing re-renders.
-- For canvas operations, use requestAnimationFrame and DPR-aware sizing to keep interactions smooth.
-
-[No sources needed since this section provides general guidance]
-
-## Troubleshooting Guide
-Common issues and resolutions:
-- App does not launch:
-  - Ensure Node version meets engine requirements.
-  - Verify dependencies installed and no corrupted node_modules.
-- Files not visible inline:
-  - Confirm custom protocol registered and CSP allows local-file scheme.
-  - Check safeStoredPath validation and file existence.
-- Permission errors writing files:
-  - Ensure userData directory exists and is writable.
-  - Validate path normalization and traversal checks.
-- Voice recording fails:
-  - Check microphone permissions and browser/media device availability.
-- Build failures:
-  - Review electron-builder configuration and target platforms.
-  - Clean artifacts and reinstall dependencies if necessary.
-
-Debugging techniques:
-- Use Electron’s built-in DevTools by enabling developer tools during development.
-- Add console logs in main process IPC handlers to trace data flow.
-- Inspect network requests for local-file protocol responses.
+### Content Security Policy
+- Restricts script sources to `'self'` only
+- Allows inline styles for theming but blocks inline scripts
+- Permits `local-file:` scheme for secure file access
+- Blocks external resources and fonts
 
 **Section sources**
 - [main.js:7-9](file://main.js#L7-L9)
-- [main.js:53-62](file://main.js#L53-L62)
-- [main.js:91-101](file://main.js#L91-L101)
+- [main.js:125-131](file://main.js#L125-L131)
 - [index.html:6](file://index.html#L6)
-- [package.json:52-54](file://package.json#L52-L54)
 
-## Conclusion
-This guide outlined the architecture, development workflow, build and distribution processes, and best practices for contributing to the Messenger project. By following the established patterns—secure IPC via preload, strict renderer isolation, robust file handling, and consistent theming—you can confidently add features, maintain backward compatibility, and deliver cross-platform packages.
+## Development Workflow
 
-[No sources needed since this section summarizes without analyzing specific files]
+### Environment Setup
+1. **Prerequisites:**
+   - Node.js version 18 or higher
+   - npm package manager
+   - Git for version control
 
-## Appendices
+2. **Installation:**
+   ```bash
+   cd 
+   npm install
+   ```
 
-### Development Workflow
-Setup:
-- Install dependencies: npm install
-- Run in development: npm start or npm dev
+3. **Development Mode:**
+   ```bash
+   npm start
+   # or
+   npm dev
+   ```
 
-Run in development mode:
-- Launches Electron with the current source tree.
-- Enables interactive debugging via DevTools.
+### Debugging Techniques
+- **Electron DevTools:** Enable developer tools during development for inspecting both main and renderer processes
+- **Console Logging:** Use console statements in main process IPC handlers to trace data flow
+- **Network Inspection:** Monitor local-file protocol requests and responses
+- **State Inspection:** Add breakpoints in renderer.js to examine application state
 
-Debugging:
-- Open DevTools from the running app.
-- Log IPC calls and file operations in main.js handlers.
-- Inspect renderer state and DOM updates in renderer.js.
+### Adding New Features
+1. **Extend Preload API:** Add new methods to `preload.js` if needed
+2. **Implement IPC Handlers:** Add corresponding handlers in `main.js`
+3. **Update Renderer:** Call new API methods from `renderer.js`
+4. **Add Styling:** Include CSS rules in `styles.css` using existing variables
+5. **Test Thoroughly:** Verify functionality across different scenarios
 
-Adding new features:
-- Extend the preload API only when necessary; prefer exposing focused methods.
-- Implement IPC handlers in main.js with proper validation and error handling.
-- Update renderer.js to call the new API and update UI accordingly.
-- Add styles in styles.css using existing variables and class conventions.
-
-Coding conventions:
-- Keep renderer isolated; avoid direct Node access.
-- Use contextBridge to expose minimal, well-named methods.
-- Validate all inputs and paths in main process.
-- Maintain backward-compatible JSON schemas for messages and settings.
-
-Backward compatibility:
-- Preserve existing fields in messages and settings objects.
-- Provide default values when reading JSON to handle older formats.
-- Avoid breaking changes to IPC method signatures.
-
-Build and distribution:
-- Build locally: npm run build or npm run dist
-- Outputs configured by electron-builder per platform.
-- Windows NSIS installer supports non-one-click installation and shortcuts.
-
-Deployment:
-- Configure additional platforms in package.json build section as needed.
-- Sign binaries and configure notarization for macOS if distributing publicly.
-- Test generated installers on target platforms before release.
-
-Testing approaches:
-- Manual testing across platforms for UI and file operations.
-- Unit tests for IPC handlers and file utilities in main.js.
-- Integration tests for renderer workflows using automated UI testing frameworks.
-
-Code organization patterns:
-- Separate concerns: main (system), preload (bridge), renderer (UI), styles (presentation).
-- Use small, focused functions and modularize logic where feasible.
-- Centralize persistence and file handling in main.js.
-
-Known tasks:
-- Refer to TODO.md for ongoing cleanup and verification tasks related to the canvas board feature.
+### Code Organization Patterns
+- Separate concerns: main (system), preload (bridge), renderer (UI), styles (presentation)
+- Use small, focused functions with clear responsibilities
+- Centralize persistence and file handling in main process
+- Maintain backward compatibility for existing data formats
 
 **Section sources**
 - [package.json:6-11](file://package.json#L6-L11)
-- [package.json:12-38](file://package.json#L12-L38)
 - [README.md:28-37](file://README.md#L28-L37)
+
+## Build and Distribution
+
+### Build Configuration
+The application uses electron-builder for cross-platform distribution:
+
+**Package Configuration:**
+- App ID: `com.messenger.selfchat`
+- Product Name: `Messenger Self-Chat`
+- Target platforms: Windows NSIS installer and portable versions
+
+**Build Artifacts:**
+- Included files: main.js, preload.js, index.html, app.js, styles.css, node_modules
+- Build resources directory: assets
+- Platform-specific configurations for Windows NSIS installer
+
+### Distribution Options
+- **NSIS Installer:** Full installation with desktop and start menu shortcuts
+- **Portable Version:** Standalone executable without installation
+- **Custom Shortcuts:** Configurable shortcut names and locations
+
+### Build Commands
+```bash
+# Development build
+npm run build
+
+# Distribution build
+npm run dist
+```
+
+**Section sources**
+- [package.json:12-38](file://package.json#L12-L38)
+- [package.json:48-54](file://package.json#L48-L54)
+
+## Testing Approaches
+
+### Manual Testing
+- **Cross-platform verification:** Test on Windows, macOS, and Linux
+- **File operation testing:** Verify attachment upload, download, and deletion
+- **UI responsiveness:** Check performance with large message histories
+- **Security validation:** Ensure sandbox restrictions work correctly
+
+### Automated Testing Considerations
+- **Unit tests:** IPC handlers and utility functions in main.js
+- **Integration tests:** End-to-end workflows using automated UI testing frameworks
+- **Performance tests:** Memory usage and rendering performance benchmarks
+
+### Testing Checklist
+- Message persistence across app restarts
+- File attachment handling for various formats
+- Theme switching and dark mode functionality
+- Canvas drawing and image export
+- Voice recording and playback
+- Search functionality with highlighting
+
+**Section sources**
 - [TODO.md:1-18](file://TODO.md#L1-L18)
+
+## Coding Conventions
+
+### JavaScript Patterns
+- Use strict mode (`"use strict"`) at module level
+- Implement arrow functions for concise callbacks
+- Use async/await for asynchronous operations
+- Follow functional programming patterns where appropriate
+
+### Security Best Practices
+- Never expose Node.js APIs directly to renderer
+- Validate all user inputs in main process
+- Use parameterized queries for any database operations
+- Implement proper error handling without leaking sensitive information
+
+### CSS Organization
+- Use CSS custom properties for theming
+- Follow BEM-like naming conventions for classes
+- Organize styles by component sections
+- Maintain responsive design with mobile-first approach
+
+### Documentation Standards
+- Comment complex logic and security considerations
+- Maintain README updates for new features
+- Keep TODO.md current with development tasks
+- Document API surfaces and interfaces
+
+**Section sources**
+- [renderer.js:1-10](file://renderer.js#L1-L10)
+- [styles.css:8-28](file://styles.css#L8-L28)
+
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+**Application Launch Problems:**
+- **Node version mismatch:** Ensure Node.js 18+ is installed
+- **Permission errors:** Check userData directory permissions
+- **Port conflicts:** Close other Electron applications
+
+**File Operation Issues:**
+- **Files not visible:** Verify custom protocol registration and CSP settings
+- **Permission denied:** Check filesystem access permissions
+- **Corrupted files:** Validate file integrity and cleanup procedures
+
+**Performance Problems:**
+- **Slow rendering:** Optimize DOM updates and use virtual scrolling for large lists
+- **Memory leaks:** Check for event listener cleanup and interval timers
+- **High CPU usage:** Debounce frequent operations like search and typing indicators
+
+**Build and Distribution Issues:**
+- **Build failures:** Clean node_modules and reinstall dependencies
+- **Platform-specific errors:** Check platform-specific configurations
+- **Signing issues:** Configure proper certificates for distribution
+
+### Debugging Strategies
+- **Process isolation:** Use separate DevTools windows for main and renderer processes
+- **Network monitoring:** Inspect local-file protocol requests
+- **State inspection:** Log application state changes and IPC communications
+- **Performance profiling:** Use browser performance tools to identify bottlenecks
+
+**Section sources**
+- [main.js:7-9](file://main.js#L7-L9)
+- [main.js:125-131](file://main.js#L125-L131)
+- [index.html:6](file://index.html#L6)
+
+## Conclusion
+This guide outlines the enhanced architecture, development workflow, build processes, and best practices for contributing to the Messenger project. The redesigned application emphasizes security through strict context isolation, secure IPC communication, and centralized path management. By following the established patterns—secure API exposure, three-panel UI architecture, robust file handling, and comprehensive theming—you can confidently add features, maintain backward compatibility, and deliver cross-platform packages.
+
+The modular architecture supports future enhancements while maintaining code quality and security standards. The comprehensive testing approach ensures reliability across different platforms and usage scenarios.
+
+## Appendices
+
+### API Reference
+
+#### Preload API Surface
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `load()` | None | Promise\<Object\> | Load messages and settings |
+| `save(data)` | Object | Promise\<Object\> | Persist application state |
+| `loadSettings()` | None | Promise\<Object\> | Load user preferences |
+| `saveSettings(settings)` | Object | Promise\<Object\> | Save user preferences |
+| `pickFiles()` | None | Promise\<Array\> | Open file picker dialog |
+| `saveCanvas(dataUrl)` | String | Promise\<Object\|null\> | Save canvas as PNG image |
+| `openFile(name)` | String | void | Open file in system default app |
+| `revealFile(name)` | String | void | Show file in system explorer |
+| `saveVoice(base64Data)` | String | Promise\<Object\|null\> | Save voice recording as WebM |
+| `notify(options)` | Object | void | Show system notification |
+| `setTheme(mode)` | String | void | Set application theme (dark/light) |
+| `fileUrl(storedName)` | String | String | Generate safe local-file URL |
+
+### Directory Structure
+```
+userData/
+├── messages.json          # Application messages and state
+├── settings.json          # User preferences and theme settings
+├── files/                 # Attached file contents (UUID-named)
+└── voice/                 # Voice recordings (WebM format)
+```
+
+### Keyboard Shortcuts
+- `Enter`: Send message
+- `Escape`: Close modals and menus
+- `Ctrl+F` / `Cmd+F`: Focus search bar
+- Various tool-specific shortcuts in canvas interface
+
+### File Formats
+- **Messages:** JSON with structured message objects
+- **Images:** PNG format for canvas exports
+- **Audio:** WebM format for voice recordings
+- **Settings:** JSON with appearance and preference data
+
+**Section sources**
+- [preload.js:3-16](file://preload.js#L3-L16)
+- [main.js:15-18](file://main.js#L15-L18)
+- [renderer.js:690-703](file://renderer.js#L690-L703)

@@ -7,8 +7,16 @@
 - [renderer.js](file://renderer.js)
 - [index.html](file://index.html)
 - [package.json](file://package.json)
-- [README.md](file://README.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated preload script documentation to reflect the new `window.api` object structure
+- Enhanced IPC communication pattern documentation with expanded channel organization
+- Added detailed security model documentation including context isolation and CSP policies
+- Expanded component interaction diagrams showing the complete API surface
+- Updated main process documentation with new IPC handlers for settings, voice, notifications, and themes
+- Enhanced renderer process documentation with new API usage patterns
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -16,36 +24,39 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+6. [Security Model](#security-model)
+7. [IPC Communication Patterns](#ipc-communication-patterns)
+8. [API Surface Documentation](#api-surface-documentation)
+9. [Dependency Analysis](#dependency-analysis)
+10. [Performance Considerations](#performance-considerations)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes the architecture of the Messenger Electron application, focusing on the separation between the main process, preload security bridge, and renderer process. It explains IPC communication patterns, context isolation, custom protocol usage for safe file access, and how UI interactions flow through IPC handlers to persistent storage. The goal is to provide both a high-level overview and code-level insights for developers and reviewers.
+This document describes the architecture of the Messenger Electron application, focusing on the enhanced separation between the main process, preload security bridge, and renderer process. The application implements a secure, modular design with improved IPC communication patterns, comprehensive API surface through the `window.api` object, and robust security measures including context isolation and Content Security Policy enforcement. It explains how UI interactions flow through well-defined IPC channels to persistent storage while maintaining strict security boundaries.
 
 ## Project Structure
-The application follows a standard Electron layout:
-- Main process (main.js): window lifecycle, IPC handlers, file system operations, native integrations, and custom protocol registration.
-- Preload script (preload.js): exposes a minimal, typed API surface to the renderer via contextBridge.
-- Renderer process (renderer.js): UI state management, user interactions, rendering, and IPC calls through the exposed API.
-- HTML/CSS assets (index.html, styles.css): UI markup and styling.
-- Package configuration (package.json): entry point, scripts, and build metadata.
+The application follows an enhanced Electron layout with clear separation of concerns:
+- Main process (main.js): window lifecycle, comprehensive IPC handlers, file system operations, native integrations, custom protocol registration, and application state management.
+- Preload script (preload.js): exposes a minimal, typed API surface via `contextBridge` through the `window.api` object, providing secure access to Electron capabilities.
+- Renderer process (renderer.js): UI state management, user interactions, rendering logic, and IPC calls through the exposed API.
+- HTML/CSS assets (index.html, styles.css): UI markup, styling, and Content Security Policy configuration.
+- Package configuration (package.json): entry point, build scripts, and deployment metadata.
 
 ```mermaid
 graph TB
 subgraph "Main Process"
-M["main.js"]
+M["main.js<br/>IPC Handlers<br/>File System<br/>Native APIs"]
 end
 subgraph "Preload Bridge"
-P["preload.js"]
+P["preload.js<br/>contextBridge<br/>window.api"]
 end
 subgraph "Renderer Process"
-R["renderer.js"]
-H["index.html"]
+R["renderer.js<br/>UI Logic<br/>State Management"]
+H["index.html<br/>CSP Policy<br/>UI Markup"]
 end
 FS["File System<br/>userData/messages.json,<br/>files/, voice/"]
-OS["OS Services<br/>dialog, shell, Notification, nativeTheme"]
+OS["OS Services<br/>dialog, shell, Notification,<br/>nativeTheme, protocol"]
 H --> R
 R --> P
 P --> M
@@ -54,59 +65,78 @@ M --> OS
 ```
 
 **Diagram sources**
-- [main.js:103-121](file://main.js#L103-L121)
-- [preload.js:3-16](file://preload.js#L3-L16)
-- [renderer.js:7-15](file://renderer.js#L7-L15)
-- [index.html:257-258](file://index.html#L257-L258)
+- [main.js:1-155](file://main.js#L1-L155)
+- [preload.js:1-17](file://preload.js#L1-L17)
+- [renderer.js:1-723](file://renderer.js#L1-L723)
+- [index.html:1-232](file://index.html#L1-L232)
 
 **Section sources**
-- [package.json:1-11](file://package.json#L1-L11)
-- [README.md:59-79](file://README.md#L59-L79)
+- [package.json:1-56](file://package.json#L1-L56)
 
 ## Core Components
-- Main process (main.js)
-  - Registers a single-instance lock and ensures required directories exist.
-  - Provides JSON persistence for messages and settings.
-  - Implements secure file handling with path validation and MIME mapping.
-  - Exposes IPC handlers for store, settings, file pick/save/open/reveal, voice recording, notifications, and theme control.
-  - Registers a custom local-file protocol to serve stored files safely.
-- Preload bridge (preload.js)
-  - Uses contextBridge to expose a small, explicit API surface to the renderer.
-  - Maps renderer calls to IPC channels without exposing Node/Electron internals.
-- Renderer process (renderer.js)
-  - Initializes UI state from persisted store and settings.
-  - Manages message composition, reactions, pinning, editing, deletion, search, and whiteboard drawing.
-  - Handles drag-and-drop and media capture flows, delegating file I/O to the main process via the preload API.
-  - Renders attachments using the custom local-file URL scheme.
+
+### Main Process (main.js)
+The main process serves as the central coordinator for all privileged operations:
+- Application lifecycle management with single-instance enforcement
+- Comprehensive JSON persistence for messages and settings
+- Secure file handling with path validation and MIME type detection
+- Custom protocol implementation for safe local file serving
+- Extensive IPC handler registry covering store, settings, file operations, voice recording, notifications, and theme management
+- Native integration with system services (dialogs, shell, notifications, theme)
+
+**Updated** Enhanced with additional IPC handlers for settings management, voice recording, system notifications, and theme switching.
+
+### Preload Security Bridge (preload.js)
+The preload script provides a secure bridge between renderer and main processes:
+- Uses `contextBridge.exposeInMainWorld()` to expose the `window.api` object
+- Maps renderer method calls to specific IPC channels without exposing Node/Electron internals
+- Provides helper functions for generating safe local-file URLs
+- Implements strict API surface limitation with only whitelisted methods
+
+**Updated** Now exposes a comprehensive API surface with 12 methods covering all major application functionality.
+
+### Renderer Process (renderer.js)
+The renderer process manages all user-facing functionality:
+- Initializes and manages UI state from persisted store and settings
+- Handles complex user interactions: message composition, reactions, pinning, editing, deletion, search, and whiteboard drawing
+- Manages media capture flows including voice recording and canvas drawing
+- Renders attachments using the custom local-file URL scheme
+- Persists state changes through the secure preload API
+
+**Updated** Enhanced with new API usage patterns for settings management, voice recording, system notifications, and theme switching.
 
 **Section sources**
-- [main.js:1-176](file://main.js#L1-L176)
-- [preload.js:1-28](file://preload.js#L1-L28)
-- [renderer.js:1-656](file://renderer.js#L1-L656)
+- [main.js:1-155](file://main.js#L1-L155)
+- [preload.js:1-17](file://preload.js#L1-L17)
+- [renderer.js:1-723](file://renderer.js#L1-L723)
 
 ## Architecture Overview
-The app uses a strict separation of concerns:
-- Main process owns all privileged operations (filesystem, dialogs, native theme, notifications).
-- Preload exposes only necessary methods to the renderer.
-- Renderer manages UI state and user interactions, calling into the preload API which forwards requests over IPC.
+The application implements a strict separation of concerns with enhanced security measures:
+- Main process owns all privileged operations (filesystem, dialogs, native theme, notifications)
+- Preload exposes only necessary methods through the `window.api` object
+- Renderer manages UI state and user interactions, calling into the preload API which forwards requests over IPC
+- Custom protocol ensures safe file access without direct filesystem exposure
 
 ```mermaid
 sequenceDiagram
 participant U as "User"
 participant R as "renderer.js"
+participant A as "window.api"
 participant B as "preload.js"
 participant M as "main.js"
 participant FS as "File System"
 participant OS as "OS Services"
 U->>R : "Type message / attach file / draw"
-R->>B : "window.messenger.saveCanvas(dataUrl)"
-B->>M : "ipcRenderer.invoke('file : saveCanvas', dataUrl)"
+R->>A : "api.saveCanvas(dataUrl)"
+A->>B : "ipcRenderer.invoke('file : saveCanvas', dataUrl)"
+B->>M : "IPC Handler : file : saveCanvas"
 M->>FS : "Write PNG to files/"
 M-->>B : "{ name, storedName, size, mime, category }"
-B-->>R : "Return attachment metadata"
+B-->>A : "Return attachment metadata"
+A-->>R : "Resolve promise with metadata"
 R->>R : "Update state and render"
-R->>B : "window.messenger.fileUrl(storedName)"
-B-->>R : "local-file : ///<encoded-storedName>"
+R->>A : "api.fileUrl(storedName)"
+A-->>R : "local-file : ///<encoded-storedName>"
 R->>R : "Render <img src='...'>"
 R->>M : "protocol.handle('local-file') request"
 M->>FS : "Stream file bytes"
@@ -114,34 +144,37 @@ M-->>R : "Response with content-type and length"
 ```
 
 **Diagram sources**
-- [renderer.js:633-637](file://renderer.js#L633-L637)
-- [preload.js:9-16](file://preload.js#L9-L16)
-- [main.js:133-141](file://main.js#L133-L141)
-- [main.js:91-101](file://main.js#L91-L101)
+- [renderer.js:683-687](file://renderer.js#L683-L687)
+- [preload.js:9](file://preload.js#L9)
+- [main.js:78-88](file://main.js#L78-L88)
+- [main.js:139-147](file://main.js#L139-L147)
 
 ## Detailed Component Analysis
 
-### Main Process (main.js)
-Responsibilities:
-- Application lifecycle and single-instance enforcement.
-- Directory initialization for files and voice recordings.
-- JSON persistence for messages and settings.
-- Secure file path resolution and MIME detection.
-- Custom protocol handler for serving stored files.
-- IPC handlers bridging renderer requests to OS and filesystem.
+### Main Process Architecture
+The main process implements a comprehensive IPC handler system:
 
-Key implementation highlights:
-- Single instance lock prevents multiple app instances.
-- Paths are resolved under userData; directories are created if missing.
-- File names are validated against traversal attacks; only allowed roots are served.
-- MIME types are inferred by extension; categories drive UI rendering.
-- Protocol handler streams files back to the renderer with correct headers.
-- IPC handlers encapsulate all side effects (dialogs, file writes, notifications, theme changes).
+**Application Lifecycle Management:**
+- Single instance lock prevents multiple app instances
+- Window creation with security-focused webPreferences configuration
+- Automatic directory initialization for files and voice recordings
 
-Security considerations:
-- Context isolation enabled; nodeIntegration disabled.
-- Safe path normalization and root checks prevent directory traversal.
-- Custom protocol restricts access to known directories.
+**Data Persistence Layer:**
+- JSON-based storage for messages and settings
+- Synchronous read/write operations for reliability
+- Error handling with fallback defaults
+
+**Security Implementation:**
+- Safe file path resolution with traversal attack prevention
+- MIME type detection and categorization
+- Custom protocol handler for secure file serving
+
+**Enhanced IPC Handlers:**
+- Store operations: load/save messages
+- Settings management: load/save preferences
+- File operations: pick, save canvas, open, reveal
+- Voice recording: save audio data
+- System integration: notifications, theme control
 
 ```mermaid
 flowchart TD
@@ -150,41 +183,46 @@ Validate --> PathCheck{"Path within allowed roots?"}
 PathCheck --> |No| Deny["Return error or null"]
 PathCheck --> |Yes| EnsureDirs["Ensure directories exist"]
 EnsureDirs --> Operation{"Operation type"}
-Operation --> |Save Canvas| SavePNG["Decode base64 -> write PNG"]
-Operation --> |Save Voice| SaveWebm["Decode base64 -> write WEBM"]
-Operation --> |Open/Reveal| OpenOS["shell.openPath/showItemInFolder"]
-Operation --> |Pick Files| Dialog["Show open dialog"]
-SavePNG --> ReturnMeta["Return {name, storedName, size, mime, category}"]
-SaveWebm --> ReturnMeta
-OpenOS --> Done(["Done"])
-Dialog --> CopyToStore["Copy selected files to files/"]
-CopyToStore --> ReturnMeta
+Operation --> |Store Operations| StoreOps["Load/Save JSON data"]
+Operation --> |Settings Operations| SettingsOps["Load/Save preferences"]
+Operation --> |File Operations| FileOps["Pick/Save/Open/Reveal files"]
+Operation --> |Voice Recording| VoiceOps["Save audio data"]
+Operation --> |System Integration| SysOps["Notifications/Theme"]
+StoreOps --> ReturnMeta["Return operation result"]
+SettingsOps --> ReturnMeta
+FileOps --> ReturnMeta
+VoiceOps --> ReturnMeta
+SysOps --> Done(["Done"])
 ReturnMeta --> Done
 Deny --> Done
 ```
 
 **Diagram sources**
-- [main.js:53-62](file://main.js#L53-L62)
-- [main.js:133-158](file://main.js#L133-L158)
-- [main.js:127-132](file://main.js#L127-L132)
+- [main.js:63-116](file://main.js#L63-L116)
+- [main.js:40-52](file://main.js#L40-L52)
 
 **Section sources**
-- [main.js:1-176](file://main.js#L1-L176)
+- [main.js:1-155](file://main.js#L1-L155)
 
-### Preload Security Bridge (preload.js)
-Responsibilities:
-- Expose a minimal, explicit API surface to the renderer via contextBridge.
-- Map renderer method calls to IPC channels.
-- Provide a helper to generate safe local-file URLs for attachments.
+### Enhanced Preload Security Bridge
+The preload script now provides a comprehensive API surface:
 
-Design principles:
-- No direct access to Node/Electron APIs in the renderer.
-- Only whitelisted functions are exposed.
-- All IPC calls use invoke for async responses.
+**API Surface Design:**
+- Exposes `window.api` object with 12 methods
+- All methods use `ipcRenderer.invoke()` for async responses
+- No direct access to Node/Electron APIs in renderer
+- Strict method whitelisting for security
+
+**Method Categories:**
+- Data persistence: `load()`, `save()`, `loadSettings()`, `saveSettings()`
+- File operations: `pickFiles()`, `saveCanvas()`, `openFile()`, `revealFile()`
+- Media handling: `saveVoice()`
+- System integration: `notify()`, `setTheme()`
+- URL generation: `fileUrl()`
 
 ```mermaid
 classDiagram
-class PreloadAPI {
+class WindowAPI {
 +load() Promise~object~
 +save(data) Promise~object~
 +loadSettings() Promise~object~
@@ -194,70 +232,103 @@ class PreloadAPI {
 +openFile(storedName) void
 +revealFile(storedName) void
 +saveVoice(base64Data) Promise~object~
-+showNotification(opts) void
++notify(options) void
 +setTheme(mode) void
 +fileUrl(storedName) string
 }
+class IPCChannels {
++store : load
++store : save
++settings : load
++settings : save
++file : pick
++file : saveCanvas
++file : open
++file : reveal
++voice : save
++notify : show
++theme : set
+}
+WindowAPI --> IPCChannels : maps to
 ```
 
 **Diagram sources**
 - [preload.js:3-16](file://preload.js#L3-L16)
 
 **Section sources**
-- [preload.js:1-28](file://preload.js#L1-L28)
+- [preload.js:1-17](file://preload.js#L1-L17)
 
-### Renderer Process (renderer.js)
-Responsibilities:
-- Initialize and manage UI state (messages, settings).
-- Handle user interactions: typing, sending messages, attaching files, emoji picker, reactions, pinning, editing, deleting, search, and whiteboard drawing.
-- Render attachments using the custom local-file URL scheme.
-- Persist state changes via the preload API.
+### Enhanced Renderer Process
+The renderer process leverages the new API surface:
 
-Data flow examples:
-- Sending a text message updates local state, re-renders, and persists via IPC.
-- Attaching files triggers file selection, copies to storage, returns metadata, and renders inline previews.
-- Whiteboard drawing converts canvas to PNG, saves via IPC, and posts as an image attachment.
+**State Management:**
+- Initializes state from persisted store and settings
+- Manages complex UI state including messages, settings, and UI components
+- Handles real-time updates and re-rendering
+
+**Enhanced User Interactions:**
+- Message composition with rich features (reactions, pinning, editing)
+- File attachment workflows with drag-and-drop support
+- Voice recording with MediaRecorder API integration
+- Whiteboard drawing with canvas manipulation
+- Search functionality with highlighting
+
+**New API Usage Patterns:**
+- Settings management through `api.loadSettings()` and `api.saveSettings()`
+- Voice recording via `api.saveVoice()`
+- System notifications through `api.notify()`
+- Theme switching with `api.setTheme()`
 
 ```mermaid
 sequenceDiagram
 participant U as "User"
 participant R as "renderer.js"
-participant B as "preload.js"
+participant A as "window.api"
 participant M as "main.js"
 U->>R : "Click Send"
 R->>R : "Add message to state"
 R->>R : "Render messages"
-R->>B : "api.save(state)"
-B->>M : "ipcRenderer.invoke('store : save', state)"
-M-->>B : "{ ok : true }"
-B-->>R : "Resolve save promise"
+R->>A : "api.save(state)"
+A->>M : "ipcRenderer.invoke('store : save', state)"
+M-->>A : "{ ok : true }"
+A-->>R : "Resolve save promise"
+R->>A : "api.notify({title, body})"
+A->>M : "ipcRenderer.invoke('notify : show', opts)"
+M-->>A : "Notification shown"
+A-->>R : "Resolve notification"
 ```
 
 **Diagram sources**
-- [renderer.js:357-368](file://renderer.js#L357-L368)
-- [preload.js:4-5](file://preload.js#L4-L5)
-- [main.js:124-124](file://main.js#L124-L124)
+- [renderer.js:57-58](file://renderer.js#L57-L58)
+- [renderer.js:231](file://renderer.js#L231)
+- [preload.js:4-13](file://preload.js#L4-L13)
 
 **Section sources**
-- [renderer.js:1-656](file://renderer.js#L1-L656)
+- [renderer.js:1-723](file://renderer.js#L1-L723)
 
-### Custom Protocol Implementation (local-file://)
-Purpose:
-- Serve stored files to the renderer without exposing the filesystem directly.
-- Enforce MIME types and content-length headers for proper media playback.
+### Custom Protocol Implementation
+The custom `local-file://` protocol provides secure file access:
 
-Behavior:
-- Extracts stored filename from URL, validates it against allowed roots, and streams the file if present.
-- Returns 404 for missing or invalid paths.
+**Security Features:**
+- Path validation against traversal attacks
+- MIME type enforcement for proper media handling
+- Content-length headers for streaming
+- Restricted to known directories only
+
+**Implementation Details:**
+- Extracts stored filename from URL
+- Validates path against allowed roots
+- Streams file content with appropriate headers
+- Returns 404 for missing or invalid paths
 
 ```mermaid
 sequenceDiagram
 participant R as "renderer.js"
-participant P as "preload.js"
+participant A as "window.api"
 participant M as "main.js"
 participant FS as "File System"
-R->>P : "fileUrl(storedName)"
-P-->>R : "local-file : ///<encoded-storedName>"
+R->>A : "api.fileUrl(storedName)"
+A-->>R : "local-file : ///<encoded-storedName>"
 R->>M : "Request local-file : ///<encoded-storedName>"
 M->>M : "Decode pathname and validate path"
 M->>FS : "Stat and stream file"
@@ -265,30 +336,137 @@ M-->>R : "Response with content-type and length"
 ```
 
 **Diagram sources**
-- [preload.js:15-16](file://preload.js#L15-L16)
-- [main.js:91-101](file://main.js#L91-L101)
+- [preload.js:15](file://preload.js#L15)
+- [main.js:139-147](file://main.js#L139-L147)
 
 **Section sources**
-- [main.js:91-101](file://main.js#L91-L101)
+- [main.js:139-147](file://main.js#L139-L147)
+
+## Security Model
+
+### Context Isolation and Sandboxing
+The application implements comprehensive security measures:
+
+**Context Isolation:**
+- Enabled via `contextIsolation: true` in BrowserWindow configuration
+- Prevents direct access to Node.js APIs from renderer
+- Isolates renderer context from main process environment
+
+**Node Integration Disabled:**
+- `nodeIntegration: false` prevents renderer from accessing Node.js modules
+- Eliminates potential security vulnerabilities from arbitrary code execution
+- Forces all privileged operations through the preload bridge
+
+**Sandbox Configuration:**
+- `sandbox: false` allows necessary functionality while maintaining security
+- Combined with context isolation provides balanced security/usability
 
 ### Content Security Policy (CSP)
-The HTML defines a CSP that:
-- Restricts default sources to self.
-- Allows inline styles for theming.
-- Permits images and media from self, local-file, data:, and blob: schemes.
-- Enables MediaRecorder and blob: for audio/video capture.
+The HTML defines a restrictive CSP policy:
 
-This policy aligns with the custom protocol and avoids loading external resources.
+**Policy Restrictions:**
+- Default sources restricted to `'self'`
+- Scripts limited to `'self'` source
+- Styles allow `'unsafe-inline'` for theming functionality
+- Images and media permit `'self'`, `data:`, `blob:`, and `local-file:` schemes
+- MediaRecorder and blob: schemes enabled for audio/video capture
+
+**Security Benefits:**
+- Prevents loading external resources
+- Restricts inline script execution
+- Allows controlled access to local files through custom protocol
+- Enables media capture functionality while maintaining security
 
 **Section sources**
+- [main.js:125-130](file://main.js#L125-L130)
 - [index.html:6](file://index.html#L6)
 
+## IPC Communication Patterns
+
+### Channel Organization
+The application uses organized IPC channels by functional area:
+
+**Store Channels:**
+- `store:load` - Load messages from persistent storage
+- `store:save` - Save messages to persistent storage
+
+**Settings Channels:**
+- `settings:load` - Load application preferences
+- `settings:save` - Save application preferences
+
+**File Operation Channels:**
+- `file:pick` - Open file selection dialog
+- `file:saveCanvas` - Save whiteboard drawings
+- `file:open` - Open files with system default application
+- `file:reveal` - Show files in system file explorer
+
+**Media Channels:**
+- `voice:save` - Save voice recordings
+
+**System Integration Channels:**
+- `notify:show` - Display system notifications
+- `theme:set` - Change application theme
+
+### Communication Flow
+All IPC communication follows a consistent pattern:
+
+1. Renderer calls `window.api.methodName(params)`
+2. Preload maps to `ipcRenderer.invoke('channel:name', params)`
+3. Main process handles via `ipcMain.handle('channel:name', handler)`
+4. Handler performs operation and returns result
+5. Result propagates back through the chain
+
+**Section sources**
+- [preload.js:3-16](file://preload.js#L3-L16)
+- [main.js:63-116](file://main.js#L63-L116)
+
+## API Surface Documentation
+
+### Window API Methods
+The `window.api` object provides a comprehensive interface:
+
+**Data Persistence Methods:**
+- `load()` - Load messages from storage
+- `save(data)` - Save messages to storage
+- `loadSettings()` - Load application settings
+- `saveSettings(data)` - Save application settings
+
+**File Operation Methods:**
+- `pickFiles()` - Open file picker dialog
+- `saveCanvas(dataUrl)` - Save canvas drawing as image
+- `openFile(storedName)` - Open file with system application
+- `revealFile(storedName)` - Show file in file explorer
+
+**Media Handling Methods:**
+- `saveVoice(base64Data)` - Save voice recording
+
+**System Integration Methods:**
+- `notify(options)` - Show system notification
+- `setTheme(mode)` - Set application theme (dark/light)
+
+**Utility Methods:**
+- `fileUrl(storedName)` - Generate local-file URL for attachments
+
+**Section sources**
+- [preload.js:3-16](file://preload.js#L3-L16)
+
 ## Dependency Analysis
-High-level dependencies:
-- main.js depends on Electron modules (app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme), Node fs/path/crypto/stream.
-- preload.js depends on contextBridge and ipcRenderer.
-- renderer.js depends on DOM APIs, Web APIs (MediaRecorder, FileReader), and the exposed window.messenger API.
-- index.html loads renderer.js and styles.css, and sets CSP.
+High-level dependencies follow a clear hierarchy:
+
+**Main Process Dependencies:**
+- Electron modules: app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme
+- Node.js modules: path, fs, crypto, Readable stream
+
+**Preload Bridge Dependencies:**
+- Electron modules: contextBridge, ipcRenderer
+
+**Renderer Process Dependencies:**
+- DOM APIs and Web APIs (MediaRecorder, FileReader, Canvas)
+- Exposed `window.api` interface
+
+**HTML Configuration:**
+- Content Security Policy definition
+- External resource loading (styles.css, renderer.js)
 
 ```mermaid
 graph LR
@@ -299,47 +477,104 @@ C["renderer.js"] --> D1["DOM/Web APIs"]
 C --> B
 H["index.html"] --> C
 H --> S["styles.css"]
+H --> CSP["Content Security Policy"]
 ```
 
 **Diagram sources**
 - [main.js:1-5](file://main.js#L1-L5)
 - [preload.js:1](file://preload.js#L1)
 - [renderer.js:1-10](file://renderer.js#L1-L10)
-- [index.html:257-258](file://index.html#L257-L258)
+- [index.html:6](file://index.html#L6)
 
 **Section sources**
-- [package.json:1-11](file://package.json#L1-L11)
+- [package.json:1-56](file://package.json#L1-L56)
 
 ## Performance Considerations
-- Streaming file responses via Readable.toWeb reduces memory overhead when serving large media.
-- Base64 decoding occurs in the main process for saved canvas and voice notes; ensure payloads are reasonable in size.
-- Rendering large lists of messages may benefit from virtualization if the dataset grows significantly.
-- Avoid excessive synchronous file operations in hot paths; current design uses sync reads/writes for small JSON files, which is acceptable for this scope.
+The enhanced architecture includes several performance optimizations:
 
-[No sources needed since this section provides general guidance]
+**Streaming File Responses:**
+- Uses `Readable.toWeb()` for efficient file streaming
+- Reduces memory overhead when serving large media files
+- Proper content-length headers enable browser caching
+
+**Asynchronous Operations:**
+- All IPC calls use `invoke()` for non-blocking operations
+- Promise-based API surface enables proper error handling
+- Background processing for file operations
+
+**State Management:**
+- Efficient state updates with selective re-rendering
+- Debounced operations for typing indicators and search
+- Optimized canvas operations for whiteboard functionality
+
+**Memory Management:**
+- Proper cleanup of media recorder streams
+- Event listener management for performance
+- Efficient string operations and DOM manipulation
 
 ## Troubleshooting Guide
-Common issues and resolutions:
-- Attachments not visible:
-  - Verify local-file protocol is registered and CSP allows local-file for images/media.
-  - Confirm stored filenames resolve within allowed roots and files exist on disk.
-- Microphone access denied:
-  - Ensure browser permissions allow getUserMedia; check platform-specific prompts.
-- Theme not applied:
-  - Check nativeTheme setting and ensure setTheme IPC handler is invoked.
-- Data loss after crash:
-  - Messages/settings are written synchronously; verify disk permissions and available space.
+Common issues and their resolutions:
+
+**Attachment Display Issues:**
+- Verify `local-file://` protocol is registered in main process
+- Check CSP allows `local-file:` for images/media sources
+- Confirm stored filenames resolve within allowed directories
+- Validate file existence and permissions
+
+**Voice Recording Problems:**
+- Ensure microphone permissions are granted
+- Check MediaRecorder API support in browser context
+- Verify base64 encoding/decoding works correctly
+- Validate audio format compatibility
+
+**Theme Not Applying:**
+- Confirm `nativeTheme.themeSource` is set correctly
+- Check `api.setTheme()` IPC handler is invoked
+- Verify CSS classes are applied to document body
+- Validate theme color definitions in styles
+
+**Settings Persistence Issues:**
+- Check file permissions for settings.json
+- Verify JSON serialization/deserialization
+- Confirm IPC handlers for settings channels are registered
+- Validate default settings structure
+
+**Security-Related Errors:**
+- Review context isolation configuration
+- Check CSP policy restrictions
+- Verify preload script is properly loaded
+- Validate API method availability in renderer
 
 **Section sources**
-- [main.js:91-101](file://main.js#L91-L101)
-- [main.js:159-166](file://main.js#L159-L166)
+- [main.js:139-147](file://main.js#L139-L147)
+- [main.js:111-115](file://main.js#L111-L115)
 - [index.html:6](file://index.html#L6)
 
 ## Conclusion
-The Messenger Electron application adheres to a secure, modular architecture:
-- The main process centralizes privileged operations and enforces safety constraints.
-- The preload bridge minimizes the attack surface by exposing only necessary methods.
-- The renderer focuses on UI logic and user interactions, communicating through well-defined IPC channels.
-- The custom local-file protocol enables safe inline media display while maintaining strict path validation and CSP policies.
+The Messenger Electron application demonstrates a modern, secure desktop application architecture with significant enhancements:
 
-This design balances usability with security, making it suitable for a private, offline-first desktop notebook experience.
+**Security Excellence:**
+- Comprehensive context isolation and CSP enforcement
+- Minimal attack surface through strict API whitelisting
+- Secure file access via custom protocol with path validation
+- Separation of privileged and unprivileged code execution contexts
+
+**Architectural Clarity:**
+- Well-defined separation between main, preload, and renderer processes
+- Organized IPC channel structure by functional area
+- Clean API surface through `window.api` object
+- Clear data flow from user interactions to persistent storage
+
+**Feature Completeness:**
+- Rich messaging interface with reactions, pinning, and editing
+- Advanced media handling including voice recording and file attachments
+- Comprehensive settings management with theme customization
+- System integration through notifications and native file operations
+
+**Developer Experience:**
+- Promise-based API surface for modern JavaScript development
+- Consistent error handling and response patterns
+- Well-documented IPC channels and method signatures
+- Modular architecture supporting future enhancements
+
+This architecture balances usability with security, making it suitable for a private, offline-first desktop notebook experience while providing a solid foundation for future feature additions and security improvements.

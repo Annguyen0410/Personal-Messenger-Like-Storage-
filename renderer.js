@@ -592,6 +592,8 @@
     if (messageInput) messageInput.addEventListener("keydown", async function (e) {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        const val = messageInput.value.trim();
+        if (val === "/world") { messageInput.value = ""; api.openMonitor(); return; }
         await addMessage(messageInput.value, []);
       }
     });

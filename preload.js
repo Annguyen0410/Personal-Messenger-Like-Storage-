@@ -12,5 +12,11 @@ contextBridge.exposeInMainWorld("api", {
   saveVoice: d => ipcRenderer.invoke("voice:save", d),
   notify: o => ipcRenderer.invoke("notify:show", o),
   setTheme: m => ipcRenderer.invoke("theme:set", m),
+  openMonitor: () => ipcRenderer.send("monitor:open"),
   fileUrl: n => `local-file:///${encodeURIComponent(n)}`
+});
+
+contextBridge.exposeInMainWorld("monitorApi", {
+  fetchQuakes: () => ipcRenderer.invoke("monitor:quakes"),
+  close: () => ipcRenderer.send("monitor:close")
 });
