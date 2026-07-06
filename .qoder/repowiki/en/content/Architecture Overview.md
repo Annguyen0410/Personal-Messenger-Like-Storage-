@@ -4,19 +4,23 @@
 **Referenced Files in This Document**
 - [main.js](file://main.js)
 - [preload.js](file://preload.js)
+- [monitor-preload.js](file://monitor-preload.js)
 - [renderer.js](file://renderer.js)
+- [monitor.js](file://monitor.js)
+- [monitor.html](file://monitor.html)
+- [monitor.css](file://monitor.css)
 - [index.html](file://index.html)
 - [package.json](file://package.json)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated preload script documentation to reflect the new `window.api` object structure
-- Enhanced IPC communication pattern documentation with expanded channel organization
-- Added detailed security model documentation including context isolation and CSP policies
-- Expanded component interaction diagrams showing the complete API surface
-- Updated main process documentation with new IPC handlers for settings, voice, notifications, and themes
-- Enhanced renderer process documentation with new API usage patterns
+- Added comprehensive World Monitor window management system with dedicated monitor process
+- Enhanced IPC communication patterns with new monitor-specific channels (monitor:open, monitor:close, monitor:quakes)
+- Expanded preload script functionality with dual API surface for main app and monitor windows
+- Integrated real-time earthquake data fetching through secure IPC handlers
+- Added advanced monitoring dashboard with financial markets, geopolitical risk assessment, and global threat visualization
+- Implemented separate security context for monitor window with specialized capabilities
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,48 +31,60 @@
 6. [Security Model](#security-model)
 7. [IPC Communication Patterns](#ipc-communication-patterns)
 8. [API Surface Documentation](#api-surface-documentation)
-9. [Dependency Analysis](#dependency-analysis)
-10. [Performance Considerations](#performance-considerations)
-11. [Troubleshooting Guide](#troubleshooting-guide)
-12. [Conclusion](#conclusion)
+9. [Monitor Window System](#monitor-window-system)
+10. [Dependency Analysis](#dependency-analysis)
+11. [Performance Considerations](#performance-considerations)
+12. [Troubleshooting Guide](#troubleshooting-guide)
+13. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes the architecture of the Messenger Electron application, focusing on the enhanced separation between the main process, preload security bridge, and renderer process. The application implements a secure, modular design with improved IPC communication patterns, comprehensive API surface through the `window.api` object, and robust security measures including context isolation and Content Security Policy enforcement. It explains how UI interactions flow through well-defined IPC channels to persistent storage while maintaining strict security boundaries.
+This document describes the architecture of the Messenger Electron application, focusing on the enhanced separation between the main process, preload security bridges, and renderer processes. The application implements a secure, modular design with improved IPC communication patterns, comprehensive API surface through dual `window.api` objects, and robust security measures including context isolation and Content Security Policy enforcement. It explains how UI interactions flow through well-defined IPC channels to persistent storage while maintaining strict security boundaries. The application now includes an advanced World Monitor system providing real-time global intelligence, financial market data, and geopolitical risk assessment capabilities.
 
 ## Project Structure
-The application follows an enhanced Electron layout with clear separation of concerns:
-- Main process (main.js): window lifecycle, comprehensive IPC handlers, file system operations, native integrations, custom protocol registration, and application state management.
-- Preload script (preload.js): exposes a minimal, typed API surface via `contextBridge` through the `window.api` object, providing secure access to Electron capabilities.
-- Renderer process (renderer.js): UI state management, user interactions, rendering logic, and IPC calls through the exposed API.
-- HTML/CSS assets (index.html, styles.css): UI markup, styling, and Content Security Policy configuration.
+The application follows an enhanced Electron layout with clear separation of concerns across multiple processes:
+- Main process (main.js): window lifecycle management, comprehensive IPC handlers, file system operations, native integrations, custom protocol registration, application state management, and multi-window coordination.
+- Preload scripts (preload.js, monitor-preload.js): provide minimal, typed API surfaces via `contextBridge` through separate `window.api` and `window.monitorApi` objects, providing secure access to Electron capabilities for different contexts.
+- Renderer processes (renderer.js, monitor.js): manage user-facing functionality with distinct responsibilities - messenger interface and world monitoring dashboard.
+- HTML/CSS assets (index.html, monitor.html, styles.css, monitor.css): UI markup, styling, and Content Security Policy configuration for both applications.
 - Package configuration (package.json): entry point, build scripts, and deployment metadata.
 
 ```mermaid
 graph TB
 subgraph "Main Process"
-M["main.js<br/>IPC Handlers<br/>File System<br/>Native APIs"]
+M["main.js<br/>IPC Handlers<br/>File System<br/>Native APIs<br/>Window Management"]
 end
-subgraph "Preload Bridge"
+subgraph "Preload Bridges"
 P["preload.js<br/>contextBridge<br/>window.api"]
+MP["monitor-preload.js<br/>contextBridge<br/>window.monitorApi"]
 end
-subgraph "Renderer Process"
-R["renderer.js<br/>UI Logic<br/>State Management"]
-H["index.html<br/>CSP Policy<br/>UI Markup"]
+subgraph "Renderer Processes"
+R["renderer.js<br/>Messenger UI<br/>State Management"]
+MR["monitor.js<br/>World Monitor<br/>Real-time Data"]
+H["index.html<br/>CSP Policy<br/>Messenger Markup"]
+MH["monitor.html<br/>Enhanced CSP<br/>Monitor Markup"]
 end
 FS["File System<br/>userData/messages.json,<br/>files/, voice/"]
-OS["OS Services<br/>dialog, shell, Notification,<br/>nativeTheme, protocol"]
+OS["OS Services<br/>dialog, shell, Notification,<br/>nativeTheme, protocol, net"]
+EXT["External APIs<br/>earthquake.usgs.gov<br/>CartoDB Maps"]
 H --> R
+MH --> MR
 R --> P
+MR --> MP
 P --> M
+MP --> M
 M --> FS
 M --> OS
+M --> EXT
 ```
 
 **Diagram sources**
-- [main.js:1-155](file://main.js#L1-L155)
-- [preload.js:1-17](file://preload.js#L1-L17)
-- [renderer.js:1-723](file://renderer.js#L1-L723)
+- [main.js:1-192](file://main.js#L1-L192)
+- [preload.js:1-23](file://preload.js#L1-L23)
+- [monitor-preload.js:1-7](file://monitor-preload.js#L1-L7)
+- [renderer.js:1-725](file://renderer.js#L1-L725)
+- [monitor.js:1-965](file://monitor.js#L1-L965)
 - [index.html:1-232](file://index.html#L1-L232)
+- [monitor.html:1-195](file://monitor.html#L1-L195)
 
 **Section sources**
 - [package.json:1-56](file://package.json#L1-L56)
@@ -76,46 +92,48 @@ M --> OS
 ## Core Components
 
 ### Main Process (main.js)
-The main process serves as the central coordinator for all privileged operations:
-- Application lifecycle management with single-instance enforcement
+The main process serves as the central coordinator for all privileged operations with enhanced multi-window support:
+- Application lifecycle management with single-instance enforcement and monitor window coordination
 - Comprehensive JSON persistence for messages and settings
 - Secure file handling with path validation and MIME type detection
 - Custom protocol implementation for safe local file serving
-- Extensive IPC handler registry covering store, settings, file operations, voice recording, notifications, and theme management
-- Native integration with system services (dialogs, shell, notifications, theme)
+- Extensive IPC handler registry covering store, settings, file operations, voice recording, notifications, theme management, and monitor-specific functionality
+- Native integration with system services (dialogs, shell, notifications, theme) and external network requests
+- Multi-window management with dedicated monitor window lifecycle control
 
-**Updated** Enhanced with additional IPC handlers for settings management, voice recording, system notifications, and theme switching.
+**Updated** Enhanced with comprehensive monitor window management, real-time earthquake data fetching, and expanded IPC handlers for cross-process communication.
 
-### Preload Security Bridge (preload.js)
-The preload script provides a secure bridge between renderer and main processes:
-- Uses `contextBridge.exposeInMainWorld()` to expose the `window.api` object
-- Maps renderer method calls to specific IPC channels without exposing Node/Electron internals
-- Provides helper functions for generating safe local-file URLs
-- Implements strict API surface limitation with only whitelisted methods
+### Preload Security Bridges (preload.js, monitor-preload.js)
+The preload scripts provide secure bridges between renderers and main processes with context-specific APIs:
+- Main app preload uses `contextBridge.exposeInMainWorld()` to expose the `window.api` object
+- Monitor preload exposes the `window.monitorApi` object with specialized monitoring capabilities
+- Both use `ipcRenderer.invoke()` and `ipcRenderer.send()` for async/sync communication
+- Strict API surface limitation with only whitelisted methods per context
+- Separate security contexts ensure proper isolation between messenger and monitor functionality
 
-**Updated** Now exposes a comprehensive API surface with 12 methods covering all major application functionality.
+**Updated** Now provides dual API surface with 12 methods for main app (`window.api`) and 2 specialized methods for monitor (`window.monitorApi`).
 
-### Renderer Process (renderer.js)
-The renderer process manages all user-facing functionality:
-- Initializes and manages UI state from persisted store and settings
-- Handles complex user interactions: message composition, reactions, pinning, editing, deletion, search, and whiteboard drawing
-- Manages media capture flows including voice recording and canvas drawing
-- Renders attachments using the custom local-file URL scheme
-- Persists state changes through the secure preload API
+### Renderer Processes (renderer.js, monitor.js)
+The renderer processes manage distinct user-facing functionalities:
+- **Messenger Renderer**: Initializes and manages UI state from persisted store and settings, handles complex user interactions including message composition, reactions, pinning, editing, deletion, search, and whiteboard drawing, manages media capture flows including voice recording and canvas drawing, renders attachments using the custom local-file URL scheme, persists state changes through the secure preload API.
+- **Monitor Renderer**: Provides comprehensive world monitoring dashboard with real-time earthquake data visualization, financial market ticker, geopolitical risk assessment, route planning and chokepoint analysis, scenario simulation engine, live threat monitoring, system status tracking, and interactive map layers with Leaflet integration.
 
-**Updated** Enhanced with new API usage patterns for settings management, voice recording, system notifications, and theme switching.
+**Updated** Enhanced with new API usage patterns for settings management, voice recording, system notifications, theme switching, and comprehensive world monitoring capabilities.
 
 **Section sources**
-- [main.js:1-155](file://main.js#L1-L155)
-- [preload.js:1-17](file://preload.js#L1-L17)
-- [renderer.js:1-723](file://renderer.js#L1-L723)
+- [main.js:1-192](file://main.js#L1-L192)
+- [preload.js:1-23](file://preload.js#L1-L23)
+- [monitor-preload.js:1-7](file://monitor-preload.js#L1-L7)
+- [renderer.js:1-725](file://renderer.js#L1-L725)
+- [monitor.js:1-965](file://monitor.js#L1-L965)
 
 ## Architecture Overview
-The application implements a strict separation of concerns with enhanced security measures:
-- Main process owns all privileged operations (filesystem, dialogs, native theme, notifications)
-- Preload exposes only necessary methods through the `window.api` object
-- Renderer manages UI state and user interactions, calling into the preload API which forwards requests over IPC
+The application implements a strict separation of concerns with enhanced security measures and multi-window support:
+- Main process owns all privileged operations (filesystem, dialogs, native theme, notifications, network requests, window management)
+- Preload bridges expose only necessary methods through context-specific API objects (`window.api`, `window.monitorApi`)
+- Renderer processes manage UI state and user interactions, calling into their respective preload APIs which forward requests over IPC
 - Custom protocol ensures safe file access without direct filesystem exposure
+- Dedicated monitor window provides isolated environment for intensive monitoring tasks
 
 ```mermaid
 sequenceDiagram
@@ -124,40 +142,51 @@ participant R as "renderer.js"
 participant A as "window.api"
 participant B as "preload.js"
 participant M as "main.js"
+participant MW as "Monitor Window"
+participant MP as "monitor-preload.js"
+participant MR as "monitor.js"
 participant FS as "File System"
 participant OS as "OS Services"
-U->>R : "Type message / attach file / draw"
-R->>A : "api.saveCanvas(dataUrl)"
-A->>B : "ipcRenderer.invoke('file : saveCanvas', dataUrl)"
-B->>M : "IPC Handler : file : saveCanvas"
-M->>FS : "Write PNG to files/"
-M-->>B : "{ name, storedName, size, mime, category }"
-B-->>A : "Return attachment metadata"
-A-->>R : "Resolve promise with metadata"
-R->>R : "Update state and render"
-R->>A : "api.fileUrl(storedName)"
-A-->>R : "local-file : ///<encoded-storedName>"
-R->>R : "Render <img src='...'>"
-R->>M : "protocol.handle('local-file') request"
-M->>FS : "Stream file bytes"
-M-->>R : "Response with content-type and length"
+participant NET as "External APIs"
+U->>R : "Type /world command"
+R->>A : "api.openMonitor()"
+A->>B : "ipcRenderer.send('monitor : open')"
+B->>M : "IPC Handler : monitor : open"
+M->>MW : "Create BrowserWindow with monitor.html"
+MW->>MP : "Load monitor-preload.js"
+MP->>MR : "Expose window.monitorApi"
+U->>MR : "Click 'Fetch Earthquakes'"
+MR->>MP : "monitorApi.fetchQuakes()"
+MP->>M : "ipcRenderer.invoke('monitor : quakes')"
+M->>NET : "fetch(earthquake.usgs.gov)"
+NET-->>M : "GeoJSON earthquake data"
+M-->>MP : "Return earthquake data"
+MP-->>MR : "Resolve promise with data"
+MR->>MR : "Update map and visualizations"
+U->>MR : "Press ESC or click close"
+MR->>MP : "monitorApi.close()"
+MP->>M : "ipcRenderer.send('monitor : close')"
+M->>MW : "Close monitor window"
 ```
 
 **Diagram sources**
-- [renderer.js:683-687](file://renderer.js#L683-L687)
-- [preload.js:9](file://preload.js#L9)
-- [main.js:78-88](file://main.js#L78-L88)
-- [main.js:139-147](file://main.js#L139-L147)
+- [renderer.js:595](file://renderer.js#L595)
+- [preload.js:15](file://preload.js#L15)
+- [main.js:127-152](file://main.js#L127-L152)
+- [monitor-preload.js:3-6](file://monitor-preload.js#L3-L6)
+- [monitor.js:232-235](file://monitor.js#L232-L235)
+- [main.js:119-125](file://main.js#L119-L125)
 
 ## Detailed Component Analysis
 
-### Main Process Architecture
-The main process implements a comprehensive IPC handler system:
+### Enhanced Main Process Architecture
+The main process implements a comprehensive IPC handler system with multi-window support:
 
 **Application Lifecycle Management:**
 - Single instance lock prevents multiple app instances
 - Window creation with security-focused webPreferences configuration
 - Automatic directory initialization for files and voice recordings
+- Monitor window lifecycle management with focus handling and cleanup
 
 **Data Persistence Layer:**
 - JSON-based storage for messages and settings
@@ -168,6 +197,7 @@ The main process implements a comprehensive IPC handler system:
 - Safe file path resolution with traversal attack prevention
 - MIME type detection and categorization
 - Custom protocol handler for secure file serving
+- Network request handling for external APIs
 
 **Enhanced IPC Handlers:**
 - Store operations: load/save messages
@@ -175,6 +205,7 @@ The main process implements a comprehensive IPC handler system:
 - File operations: pick, save canvas, open, reveal
 - Voice recording: save audio data
 - System integration: notifications, theme control
+- **Monitor operations**: open/close monitor window, fetch earthquake data
 
 ```mermaid
 flowchart TD
@@ -188,37 +219,42 @@ Operation --> |Settings Operations| SettingsOps["Load/Save preferences"]
 Operation --> |File Operations| FileOps["Pick/Save/Open/Reveal files"]
 Operation --> |Voice Recording| VoiceOps["Save audio data"]
 Operation --> |System Integration| SysOps["Notifications/Theme"]
+Operation --> |Monitor Operations| MonOps["Open/Close/Fetch Data"]
 StoreOps --> ReturnMeta["Return operation result"]
 SettingsOps --> ReturnMeta
 FileOps --> ReturnMeta
 VoiceOps --> ReturnMeta
 SysOps --> Done(["Done"])
+MonOps --> Done
 ReturnMeta --> Done
 Deny --> Done
 ```
 
 **Diagram sources**
-- [main.js:63-116](file://main.js#L63-L116)
+- [main.js:64-153](file://main.js#L64-L153)
 - [main.js:40-52](file://main.js#L40-L52)
 
 **Section sources**
-- [main.js:1-155](file://main.js#L1-L155)
+- [main.js:1-192](file://main.js#L1-L192)
 
-### Enhanced Preload Security Bridge
-The preload script now provides a comprehensive API surface:
+### Enhanced Preload Security Bridges
+The preload scripts now provide comprehensive, context-specific API surfaces:
 
-**API Surface Design:**
-- Exposes `window.api` object with 12 methods
+**Main App API Surface (`window.api`):**
+- Exposes 12 methods for messenger functionality
 - All methods use `ipcRenderer.invoke()` for async responses
 - No direct access to Node/Electron APIs in renderer
 - Strict method whitelisting for security
 
+**Monitor API Surface (`window.monitorApi`):**
+- Exposes 2 specialized methods for monitoring functionality
+- Simplified API focused on data fetching and window control
+- Separate security context prevents cross-contamination
+- Optimized for real-time data operations
+
 **Method Categories:**
-- Data persistence: `load()`, `save()`, `loadSettings()`, `saveSettings()`
-- File operations: `pickFiles()`, `saveCanvas()`, `openFile()`, `revealFile()`
-- Media handling: `saveVoice()`
-- System integration: `notify()`, `setTheme()`
-- URL generation: `fileUrl()`
+- **Main App**: Data persistence, file operations, media handling, system integration, URL generation, monitor control
+- **Monitor**: Earthquake data fetching, window closure
 
 ```mermaid
 classDiagram
@@ -234,92 +270,99 @@ class WindowAPI {
 +saveVoice(base64Data) Promise~object~
 +notify(options) void
 +setTheme(mode) void
++openMonitor() void
 +fileUrl(storedName) string
 }
+class MonitorAPI {
++fetchQuakes() Promise~object~
++close() void
+}
 class IPCChannels {
-+store : load
-+store : save
-+settings : load
-+settings : save
-+file : pick
-+file : saveCanvas
-+file : open
-+file : reveal
++store : load/save
++settings : load/save
++file : pick/saveCanvas/open/reveal
 +voice : save
 +notify : show
 +theme : set
++monitor : open/close/quakes
 }
 WindowAPI --> IPCChannels : maps to
+MonitorAPI --> IPCChannels : maps to
 ```
 
 **Diagram sources**
 - [preload.js:3-16](file://preload.js#L3-L16)
+- [monitor-preload.js:3-6](file://monitor-preload.js#L3-L6)
 
 **Section sources**
-- [preload.js:1-17](file://preload.js#L1-L17)
+- [preload.js:1-23](file://preload.js#L1-L23)
+- [monitor-preload.js:1-7](file://monitor-preload.js#L1-L7)
 
-### Enhanced Renderer Process
-The renderer process leverages the new API surface:
+### Enhanced Renderer Processes
+The renderer processes leverage their respective API surfaces:
 
-**State Management:**
-- Initializes state from persisted store and settings
-- Manages complex UI state including messages, settings, and UI components
-- Handles real-time updates and re-rendering
+**Messenger Renderer Enhancements:**
+- State management with enhanced settings integration
+- Complex UI state including messages, settings, and UI components
+- Real-time updates and re-rendering with performance optimizations
+- New API usage patterns for monitor window control
 
-**Enhanced User Interactions:**
-- Message composition with rich features (reactions, pinning, editing)
-- File attachment workflows with drag-and-drop support
-- Voice recording with MediaRecorder API integration
-- Whiteboard drawing with canvas manipulation
-- Search functionality with highlighting
-
-**New API Usage Patterns:**
-- Settings management through `api.loadSettings()` and `api.saveSettings()`
-- Voice recording via `api.saveVoice()`
-- System notifications through `api.notify()`
-- Theme switching with `api.setTheme()`
+**Monitor Renderer Capabilities:**
+- Comprehensive world monitoring dashboard with real-time data
+- Interactive map visualization using Leaflet.js
+- Financial market ticker with live price updates
+- Geopolitical risk assessment with country scoring
+- Route planning and chokepoint analysis
+- Scenario simulation engine for crisis planning
+- Live threat monitoring with automated alert generation
+- System status tracking and network activity visualization
+- Global time zone display and satellite tracking
 
 ```mermaid
 sequenceDiagram
 participant U as "User"
-participant R as "renderer.js"
-participant A as "window.api"
+participant MR as "monitor.js"
+participant MA as "window.monitorApi"
+participant MP as "monitor-preload.js"
 participant M as "main.js"
-U->>R : "Click Send"
-R->>R : "Add message to state"
-R->>R : "Render messages"
-R->>A : "api.save(state)"
-A->>M : "ipcRenderer.invoke('store : save', state)"
-M-->>A : "{ ok : true }"
-A-->>R : "Resolve save promise"
-R->>A : "api.notify({title, body})"
-A->>M : "ipcRenderer.invoke('notify : show', opts)"
-M-->>A : "Notification shown"
-A-->>R : "Resolve notification"
+participant NET as "Earthquake API"
+U->>MR : "Initialize monitor dashboard"
+MR->>MA : "monitorApi.fetchQuakes()"
+MA->>MP : "ipcRenderer.invoke('monitor : quakes')"
+MP->>M : "IPC Handler : monitor : quakes"
+M->>NET : "fetch('https : //earthquake.usgs.gov/...')"
+NET-->>M : "GeoJSON earthquake data"
+M-->>MP : "Return parsed earthquake data"
+MP-->>MA : "Resolve promise with data"
+MA-->>MR : "Return earthquake features"
+MR->>MR : "Render map markers and visualizations"
 ```
 
 **Diagram sources**
-- [renderer.js:57-58](file://renderer.js#L57-L58)
-- [renderer.js:231](file://renderer.js#L231)
-- [preload.js:4-13](file://preload.js#L4-L13)
+- [monitor.js:7-13](file://monitor.js#L7-L13)
+- [monitor-preload.js:4](file://monitor-preload.js#L4)
+- [main.js:119-125](file://main.js#L119-L125)
 
 **Section sources**
-- [renderer.js:1-723](file://renderer.js#L1-L723)
+- [renderer.js:1-725](file://renderer.js#L1-L725)
+- [monitor.js:1-965](file://monitor.js#L1-L965)
 
 ### Custom Protocol Implementation
-The custom `local-file://` protocol provides secure file access:
+The custom `local-file://` protocol provides secure file access with enhanced monitoring capabilities:
 
 **Security Features:**
 - Path validation against traversal attacks
 - MIME type enforcement for proper media handling
 - Content-length headers for streaming
 - Restricted to known directories only
+- Support for both messenger files and voice recordings
 
 **Implementation Details:**
 - Extracts stored filename from URL
 - Validates path against allowed roots
 - Streams file content with appropriate headers
 - Returns 404 for missing or invalid paths
+- Supports both image/video/audio/file categories
 
 ```mermaid
 sequenceDiagram
@@ -328,63 +371,73 @@ participant A as "window.api"
 participant M as "main.js"
 participant FS as "File System"
 R->>A : "api.fileUrl(storedName)"
-A-->>R : "local-file : ///<encoded-storedName>"
-R->>M : "Request local-file : ///<encoded-storedName>"
+A-->>R : "local-file : ///encoded-storedName"
+R->>M : "Request local-file : ///encoded-storedName"
 M->>M : "Decode pathname and validate path"
 M->>FS : "Stat and stream file"
 M-->>R : "Response with content-type and length"
 ```
 
 **Diagram sources**
-- [preload.js:15](file://preload.js#L15)
-- [main.js:139-147](file://main.js#L139-L147)
+- [preload.js:16](file://preload.js#L16)
+- [main.js:176-184](file://main.js#L176-L184)
 
 **Section sources**
-- [main.js:139-147](file://main.js#L139-L147)
+- [main.js:176-184](file://main.js#L176-L184)
 
 ## Security Model
 
 ### Context Isolation and Sandboxing
-The application implements comprehensive security measures:
+The application implements comprehensive security measures across multiple contexts:
 
 **Context Isolation:**
-- Enabled via `contextIsolation: true` in BrowserWindow configuration
-- Prevents direct access to Node.js APIs from renderer
-- Isolates renderer context from main process environment
+- Enabled via `contextIsolation: true` in all BrowserWindow configurations
+- Prevents direct access to Node.js APIs from renderers
+- Isolates renderer contexts from main process environment
+- Separate contexts for main app and monitor windows
 
 **Node Integration Disabled:**
-- `nodeIntegration: false` prevents renderer from accessing Node.js modules
+- `nodeIntegration: false` prevents renderers from accessing Node.js modules
 - Eliminates potential security vulnerabilities from arbitrary code execution
-- Forces all privileged operations through the preload bridge
+- Forces all privileged operations through preload bridges
 
 **Sandbox Configuration:**
 - `sandbox: false` allows necessary functionality while maintaining security
 - Combined with context isolation provides balanced security/usability
+- Different sandbox policies for different window types
 
 ### Content Security Policy (CSP)
-The HTML defines a restrictive CSP policy:
+Both applications define restrictive CSP policies tailored to their needs:
 
-**Policy Restrictions:**
+**Messenger CSP Restrictions:**
 - Default sources restricted to `'self'`
 - Scripts limited to `'self'` source
 - Styles allow `'unsafe-inline'` for theming functionality
 - Images and media permit `'self'`, `data:`, `blob:`, and `local-file:` schemes
 - MediaRecorder and blob: schemes enabled for audio/video capture
 
+**Monitor CSP Enhancements:**
+- Allows external HTTPS resources for mapping and data APIs
+- Permits connections to earthquake.usgs.gov and CartoDB basemap servers
+- Maintains `'unsafe-inline'` for dynamic styling and animations
+- Enables external JavaScript libraries (Leaflet.js)
+
 **Security Benefits:**
-- Prevents loading external resources
-- Restricts inline script execution
+- Prevents loading unauthorized external resources
+- Restricts inline script execution where possible
 - Allows controlled access to local files through custom protocol
-- Enables media capture functionality while maintaining security
+- Enables required third-party services while maintaining security boundaries
 
 **Section sources**
-- [main.js:125-130](file://main.js#L125-L130)
+- [main.js:162-167](file://main.js#L162-L167)
+- [main.js:136-141](file://main.js#L136-L141)
 - [index.html:6](file://index.html#L6)
+- [monitor.html:5](file://monitor.html#L5)
 
 ## IPC Communication Patterns
 
-### Channel Organization
-The application uses organized IPC channels by functional area:
+### Enhanced Channel Organization
+The application uses organized IPC channels by functional area with monitor-specific extensions:
 
 **Store Channels:**
 - `store:load` - Load messages from persistent storage
@@ -407,23 +460,37 @@ The application uses organized IPC channels by functional area:
 - `notify:show` - Display system notifications
 - `theme:set` - Change application theme
 
-### Communication Flow
-All IPC communication follows a consistent pattern:
+**Monitor Channels:**
+- `monitor:open` - Open world monitor window
+- `monitor:close` - Close world monitor window
+- `monitor:quakes` - Fetch real-time earthquake data
 
+### Communication Flow
+All IPC communication follows consistent patterns with context-specific variations:
+
+**Main App Flow:**
 1. Renderer calls `window.api.methodName(params)`
 2. Preload maps to `ipcRenderer.invoke('channel:name', params)`
 3. Main process handles via `ipcMain.handle('channel:name', handler)`
 4. Handler performs operation and returns result
 5. Result propagates back through the chain
 
+**Monitor Flow:**
+1. Monitor renderer calls `window.monitorApi.methodName(params)`
+2. Monitor preload maps to `ipcRenderer.invoke/send('monitor:channel', params)`
+3. Main process handles via `ipcMain.handle/on('monitor:channel', handler)`
+4. Handler performs operation (may include network requests)
+5. Result propagates back to monitor renderer
+
 **Section sources**
 - [preload.js:3-16](file://preload.js#L3-L16)
-- [main.js:63-116](file://main.js#L63-L116)
+- [monitor-preload.js:3-6](file://monitor-preload.js#L3-L6)
+- [main.js:64-153](file://main.js#L64-L153)
 
 ## API Surface Documentation
 
-### Window API Methods
-The `window.api` object provides a comprehensive interface:
+### Window API Methods (`window.api`)
+The main app `window.api` object provides a comprehensive interface:
 
 **Data Persistence Methods:**
 - `load()` - Load messages from storage
@@ -446,51 +513,136 @@ The `window.api` object provides a comprehensive interface:
 
 **Utility Methods:**
 - `fileUrl(storedName)` - Generate local-file URL for attachments
+- `openMonitor()` - Open world monitor window
+
+### Monitor API Methods (`window.monitorApi`)
+The monitor `window.monitorApi` object provides specialized monitoring capabilities:
+
+**Data Access Methods:**
+- `fetchQuakes()` - Fetch real-time earthquake data from USGS API
+
+**Window Control Methods:**
+- `close()` - Close the monitor window
 
 **Section sources**
 - [preload.js:3-16](file://preload.js#L3-L16)
+- [monitor-preload.js:3-6](file://monitor-preload.js#L3-L6)
+
+## Monitor Window System
+
+### Multi-Window Architecture
+The application implements a sophisticated multi-window system with the World Monitor as a specialized secondary window:
+
+**Monitor Window Management:**
+- Dedicated BrowserWindow instance with fullscreen, frameless presentation
+- Separate preload script (`monitor-preload.js`) with specialized API surface
+- Independent security context with enhanced CSP for external resources
+- Lifecycle management with automatic cleanup and focus handling
+- Development tools integration for debugging
+
+**Monitor Window Features:**
+- Fullscreen immersive experience optimized for monitoring dashboards
+- Dark theme with high-contrast colors for extended viewing
+- Real-time data updates with animated visualizations
+- Interactive map layers with multiple data overlays
+- Financial market ticker with live price updates
+- Geopolitical risk assessment with country scoring systems
+- Route planning and chokepoint analysis tools
+- Scenario simulation engine for crisis planning
+- Live threat monitoring with automated alert generation
+
+**Integration with Main App:**
+- Triggered via `/world` command in messenger interface
+- Seamless window management with focus restoration
+- Shared IPC infrastructure for cross-window communication
+- Independent data fetching and processing capabilities
+
+```mermaid
+graph TB
+subgraph "Main Application"
+MM["Main Messenger Window"]
+MA["window.api"]
+end
+subgraph "Monitor System"
+MW["Monitor Window"]
+MP["monitor-preload.js"]
+MAPI["window.monitorApi"]
+end
+subgraph "Shared Infrastructure"
+MI["Main Process IPC"]
+FS["File System"]
+NET["Network APIs"]
+end
+MM --> |"monitor:open"| MI
+MI --> MW
+MW --> MP
+MP --> MAPI
+MAPI --> |"monitor:quakes"| MI
+MI --> NET
+MI --> FS
+```
+
+**Diagram sources**
+- [main.js:127-152](file://main.js#L127-L152)
+- [monitor-preload.js:1-7](file://monitor-preload.js#L1-L7)
+- [renderer.js:595](file://renderer.js#L595)
+
+**Section sources**
+- [main.js:127-152](file://main.js#L127-L152)
+- [monitor.html:1-195](file://monitor.html#L1-L195)
+- [monitor.js:1-965](file://monitor.js#L1-L965)
 
 ## Dependency Analysis
-High-level dependencies follow a clear hierarchy:
+High-level dependencies follow a clear hierarchy with enhanced monitoring capabilities:
 
 **Main Process Dependencies:**
-- Electron modules: app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme
+- Electron modules: app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme, net
 - Node.js modules: path, fs, crypto, Readable stream
 
 **Preload Bridge Dependencies:**
-- Electron modules: contextBridge, ipcRenderer
+- Electron modules: contextBridge, ipcRenderer (both main and monitor preloads)
 
 **Renderer Process Dependencies:**
-- DOM APIs and Web APIs (MediaRecorder, FileReader, Canvas)
-- Exposed `window.api` interface
+- **Messenger**: DOM APIs and Web APIs (MediaRecorder, FileReader, Canvas), exposed `window.api` interface
+- **Monitor**: Leaflet.js mapping library, extensive DOM manipulation, real-time data visualization APIs, exposed `window.monitorApi` interface
 
 **HTML Configuration:**
-- Content Security Policy definition
-- External resource loading (styles.css, renderer.js)
+- **Messenger**: Content Security Policy definition, external resource loading
+- **Monitor**: Enhanced CSP allowing external HTTPS resources, Leaflet.js CDN integration
 
 ```mermaid
 graph LR
-A["main.js"] --> E1["Electron (app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme)"]
+A["main.js"] --> E1["Electron (app, BrowserWindow, ipcMain, dialog, shell, protocol, Notification, nativeTheme, net)"]
 A --> N1["Node (path, fs, crypto, stream)"]
 B["preload.js"] --> E2["Electron (contextBridge, ipcRenderer)"]
+MP["monitor-preload.js"] --> E3["Electron (contextBridge, ipcRenderer)"]
 C["renderer.js"] --> D1["DOM/Web APIs"]
 C --> B
+MR["monitor.js"] --> L["Leaflet.js"]
+MR --> D2["Real-time Visualization APIs"]
+MR --> MP
 H["index.html"] --> C
+MH["monitor.html"] --> MR
 H --> S["styles.css"]
-H --> CSP["Content Security Policy"]
+MH --> MC["monitor.css"]
+H --> CSP["CSP (restrictive)"]
+MH --> MCP["CSP (enhanced)"]
 ```
 
 **Diagram sources**
 - [main.js:1-5](file://main.js#L1-L5)
 - [preload.js:1](file://preload.js#L1)
+- [monitor-preload.js:1](file://monitor-preload.js#L1)
 - [renderer.js:1-10](file://renderer.js#L1-L10)
+- [monitor.js:191-192](file://monitor.js#L191-L192)
 - [index.html:6](file://index.html#L6)
+- [monitor.html:5-8](file://monitor.html#L5-L8)
 
 **Section sources**
 - [package.json:1-56](file://package.json#L1-L56)
 
 ## Performance Considerations
-The enhanced architecture includes several performance optimizations:
+The enhanced architecture includes several performance optimizations for both messenger and monitoring functionality:
 
 **Streaming File Responses:**
 - Uses `Readable.toWeb()` for efficient file streaming
@@ -500,20 +652,28 @@ The enhanced architecture includes several performance optimizations:
 **Asynchronous Operations:**
 - All IPC calls use `invoke()` for non-blocking operations
 - Promise-based API surface enables proper error handling
-- Background processing for file operations
+- Background processing for file operations and network requests
 
 **State Management:**
 - Efficient state updates with selective re-rendering
 - Debounced operations for typing indicators and search
 - Optimized canvas operations for whiteboard functionality
+- Real-time data updates with efficient DOM manipulation
 
 **Memory Management:**
 - Proper cleanup of media recorder streams
 - Event listener management for performance
 - Efficient string operations and DOM manipulation
+- Monitor window lifecycle management with automatic cleanup
+
+**Monitoring-Specific Optimizations:**
+- Lazy loading of heavy map visualizations
+- Efficient data polling with configurable intervals
+- Optimized rendering for real-time chart updates
+- Memory-efficient event handling for continuous data streams
 
 ## Troubleshooting Guide
-Common issues and their resolutions:
+Common issues and their resolutions with enhanced monitoring capabilities:
 
 **Attachment Display Issues:**
 - Verify `local-file://` protocol is registered in main process
@@ -539,42 +699,60 @@ Common issues and their resolutions:
 - Confirm IPC handlers for settings channels are registered
 - Validate default settings structure
 
+**Monitor Window Issues:**
+- Verify monitor window creation succeeds in main process
+- Check monitor-preload.js loads correctly
+- Ensure monitor.html CSP allows external resources
+- Validate Leaflet.js CDN accessibility
+- Confirm earthquake API endpoint availability
+
+**Monitor Data Loading Problems:**
+- Check network connectivity to earthquake.usgs.gov
+- Verify CORS policy allows cross-origin requests
+- Validate GeoJSON response parsing
+- Monitor console logs for API errors
+
 **Security-Related Errors:**
-- Review context isolation configuration
-- Check CSP policy restrictions
-- Verify preload script is properly loaded
-- Validate API method availability in renderer
+- Review context isolation configuration for both windows
+- Check CSP policy restrictions for each context
+- Verify preload scripts are properly loaded
+- Validate API method availability in respective renderers
 
 **Section sources**
-- [main.js:139-147](file://main.js#L139-L147)
-- [main.js:111-115](file://main.js#L111-L115)
+- [main.js:176-184](file://main.js#L176-L184)
+- [main.js:119-125](file://main.js#L119-L125)
 - [index.html:6](file://index.html#L6)
+- [monitor.html:5](file://monitor.html#L5)
 
 ## Conclusion
-The Messenger Electron application demonstrates a modern, secure desktop application architecture with significant enhancements:
+The Messenger Electron application demonstrates a modern, secure desktop application architecture with significant enhancements including a comprehensive World Monitor system:
 
 **Security Excellence:**
-- Comprehensive context isolation and CSP enforcement
-- Minimal attack surface through strict API whitelisting
+- Comprehensive context isolation and CSP enforcement across multiple windows
+- Minimal attack surface through strict API whitelisting per context
 - Secure file access via custom protocol with path validation
 - Separation of privileged and unprivileged code execution contexts
+- Specialized security contexts for different application modes
 
 **Architectural Clarity:**
 - Well-defined separation between main, preload, and renderer processes
-- Organized IPC channel structure by functional area
-- Clean API surface through `window.api` object
+- Organized IPC channel structure by functional area with monitor extensions
+- Clean API surface through context-specific `window.api` objects
 - Clear data flow from user interactions to persistent storage
+- Multi-window coordination with independent lifecycles
 
 **Feature Completeness:**
 - Rich messaging interface with reactions, pinning, and editing
 - Advanced media handling including voice recording and file attachments
 - Comprehensive settings management with theme customization
 - System integration through notifications and native file operations
+- **World Monitor**: Real-time earthquake visualization, financial market data, geopolitical risk assessment, route planning, scenario simulation, and live threat monitoring
 
 **Developer Experience:**
 - Promise-based API surface for modern JavaScript development
 - Consistent error handling and response patterns
 - Well-documented IPC channels and method signatures
 - Modular architecture supporting future enhancements
+- Separate contexts for different application modes
 
-This architecture balances usability with security, making it suitable for a private, offline-first desktop notebook experience while providing a solid foundation for future feature additions and security improvements.
+This architecture balances usability with security while providing powerful monitoring capabilities, making it suitable for both private note-taking and real-time global intelligence gathering while maintaining a solid foundation for future feature additions and security improvements.

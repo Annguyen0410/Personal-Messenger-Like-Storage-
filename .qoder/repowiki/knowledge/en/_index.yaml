@@ -3,7 +3,7 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-07-05T22:11:17Z"
+exported_at: "2026-07-05T23:43:16Z"
 modules:
     "":
         dir_name: Messenger Self-Chat — Electron Desktop Notebook
@@ -20,6 +20,19 @@ modules:
             - preload.js
             - renderer.js
             - styles.css
+        source_files: []
+        children:
+            - monitor
+        depends_on: []
+        related_to: []
+    monitor:
+        dir_name: World Monitor — Geopolitical & Seismic Dashboard
+        title: World Monitor — Geopolitical & Seismic Dashboard
+        scope:
+            - monitor.html
+            - monitor.css
+            - monitor.js
+            - monitor-preload.js
         source_files: []
         children: []
         depends_on: []

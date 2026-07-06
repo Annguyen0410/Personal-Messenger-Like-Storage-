@@ -1,1 +1,0 @@
-Electron desktop self-chat notebook styled like Facebook Messenger, supporting text, file attachments, voice notes, a Canvas whiteboard, and local JSON persistence.
