@@ -3,11 +3,11 @@ schema_version: 1
 locale: en-US
 branch: main
 nodes_managed: true
-exported_at: "2026-07-05T23:43:16Z"
+exported_at: "2026-07-06T17:41:38Z"
 modules:
     "":
-        dir_name: Messenger Self-Chat — Electron Desktop Notebook
-        title: Messenger Self-Chat — Electron Desktop Notebook
+        dir_name: Messenger Self-Chat Electron App
+        title: Messenger Self-Chat Electron App
         scope:
             - README.md
             - TODO.md
@@ -26,8 +26,8 @@ modules:
         depends_on: []
         related_to: []
     monitor:
-        dir_name: World Monitor — Geopolitical & Seismic Dashboard
-        title: World Monitor — Geopolitical & Seismic Dashboard
+        dir_name: World Monitor Dashboard (Electron Renderer)
+        title: World Monitor Dashboard (Electron Renderer)
         scope:
             - monitor.html
             - monitor.css

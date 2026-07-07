@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: Messenger Self-Chat — Electron Desktop Notebook
+title: Messenger Self-Chat Electron App
 scope:
     - README.md
     - TODO.md

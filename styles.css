@@ -135,6 +135,7 @@ body.theme-gradient{--accent:#667eea;--accent-hover:#5a67d8;--accent-dark:#764ba
 .msg-hover-actions{position:absolute;top:-12px;display:flex;gap:2px;opacity:0;transition:opacity .12s;pointer-events:none;background:var(--bg-primary);border-radius:16px;padding:2px;box-shadow:0 1px 4px var(--shadow);border:1px solid var(--border)}
 .msg-row.me .msg-hover-actions{right:0}
 .msg-row:hover .msg-hover-actions{opacity:1;pointer-events:auto}
+.msg-row.actions-visible .msg-hover-actions{opacity:1;pointer-events:auto}
 .msg-hover-btn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--text-secondary);transition:background .12s,color .12s}
 .msg-hover-btn:hover{background:var(--bg-secondary);color:var(--text-primary)}
 .msg-hover-btn svg{width:14px;height:14px}

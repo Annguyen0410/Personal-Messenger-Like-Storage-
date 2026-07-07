@@ -1,0 +1,1 @@
+Dark-themed Electron renderer dashboard that overlays live earthquake, threat, financial, and infrastructure data on a Leaflet world map with toggleable HUD widgets.

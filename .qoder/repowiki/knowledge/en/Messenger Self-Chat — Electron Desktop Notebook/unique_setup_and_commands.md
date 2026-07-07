@@ -1,1 +1,0 @@
-`npm install` pulls ~90 MB of Electron on first run; `npm start` (or `npm run dev`) launches the window; `npm run build` / `npm run dist` produces an NSIS installer and a portable zip via `electron-builder`.

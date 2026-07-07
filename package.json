@@ -18,6 +18,10 @@
       "index.html",
       "app.js",
       "styles.css",
+      "monitor.html",
+      "monitor.js",
+      "monitor.css",
+      "monitor-preload.js",
       "node_modules/**/*"
     ],
     "directories": {

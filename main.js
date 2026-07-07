@@ -124,6 +124,52 @@ function registerHandlers() {
     } catch { return null; }
   });
 
+  ipcMain.handle("monitor:indices", async () => {
+    const https = require("https");
+    const symbols = ["^GSPC", "^IXIC", "^FTSE", "^N225", "000001.SS", "^VIX", "^TNX"];
+    const results = [];
+    for (const sym of symbols) {
+      try {
+        const data = await new Promise((resolve, reject) => {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
+          https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
+            let body = "";
+            res.on("data", (c) => (body += c));
+            res.on("end", () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+          }).on("error", () => resolve(null));
+        });
+        if (data && data.chart && data.chart.result && data.chart.result[0]) {
+          const meta = data.chart.result[0].meta;
+          const prev = meta.previousClose || meta.chartPreviousClose || 0;
+          const price = meta.regularMarketPrice || 0;
+          if (price) results.push({ symbol: sym, regularMarketPrice: price, regularMarketChangePercent: prev ? ((price - prev) / prev * 100) : 0 });
+        }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    return { quoteResponse: { result: results, error: null } };
+  });
+
+  ipcMain.handle("monitor:2y-yield", async () => {
+    try {
+      const https = require("https");
+      const data = await new Promise((resolve) => {
+        https.get("https://query1.finance.yahoo.com/v8/finance/chart/2YY%3DF?interval=1d&range=1d", { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
+          let body = "";
+          res.on("data", (c) => (body += c));
+          res.on("end", () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+        }).on("error", () => resolve(null));
+      });
+      if (data && data.chart && data.chart.result && data.chart.result[0]) {
+        const meta = data.chart.result[0].meta;
+        const prev = meta.previousClose || meta.chartPreviousClose || meta.regularMarketPrice || 0;
+        const price = meta.regularMarketPrice || meta.regularMarketPreviousClose || prev;
+        meta.regularMarketChangePercent = prev ? ((price - prev) / prev * 100) : 0;
+      }
+      return data;
+    } catch { return null; }
+  });
+
   ipcMain.on("monitor:open", () => {
     console.log("[Main] monitor:open received");
     if (monitorWin) { console.log("[Main] monitor already open, focusing"); monitorWin.focus(); return; }

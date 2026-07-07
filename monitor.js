@@ -316,6 +316,17 @@ console.log("[Monitor] JS loaded");
     { name: "Polygon", sym: "MATIC", icon: "⬡", price: 0.46, chg: -2.10, dom: "0.5%" }
   ];
 
+  var FIN_STOCKS = [
+    { name: "S&P 500", sym: "S&P500", price: 5280.15, chg: 0.62 },
+    { name: "NASDAQ", sym: "NASDAQ", price: 18642.30, chg: 1.12 },
+    { name: "FTSE 100", sym: "FTSE100", price: 8420.55, chg: -0.18 },
+    { name: "Nikkei 225", sym: "NIKKEI", price: 38250.40, chg: 0.84 },
+    { name: "Shanghai Comp.", sym: "SHCOMP", price: 3150.80, chg: -0.45 },
+    { name: "VIX", sym: "VIX", price: 14.22, chg: 5.18 },
+    { name: "US 10Y Yield", sym: "US10Y", price: 4.312, chg: -0.12 },
+    { name: "US 2Y Yield", sym: "US2Y", price: 4.065, chg: -0.08 }
+  ];
+
   var FIN_YIELD = [
     { name: "US 2Y-10Y Spread", val: "24.7bp", chg: -3.2 },
     { name: "US 3M-10Y Spread", val: "-18.5bp", chg: -2.1 },
@@ -475,6 +486,10 @@ console.log("[Monitor] JS loaded");
   var API_OPENSKY = "https://opensky-network.org/api/states/all";
   var API_EONET = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=80";
   var API_ISS = "https://api.wheretheiss.at/v1/satellites/25544";
+var API_COINGECKO = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,binancecoin,cardano,avalanche-2,matic-network,tether-gold&vs_currencies=usd&include_24h_change=true";
+var API_FOREX = "https://open.er-api.com/v6/latest/USD";
+var liveCryptoPrices = null;
+var liveForexRates = null;
 
   function fetchAircraft() {
     fetch(API_OPENSKY)
@@ -661,15 +676,182 @@ console.log("[Monitor] JS loaded");
     }
   }
 
+  /* ===== LIVE FINANCE DATA ===== */
+  function fetchLiveCrypto() {
+    fetch(API_COINGECKO)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data) return;
+        var prices = {};
+        var idMap = { bitcoin: "BTC", ethereum: "ETH", solana: "SOL", ripple: "XRP", binancecoin: "BNB", cardano: "ADA", "avalanche-2": "AVAX", "matic-network": "MATIC", "tether-gold": "XAU" };
+        for (var id in idMap) {
+          if (data[id]) prices[idMap[id]] = { price: data[id].usd, chg: data[id].usd_24h_change || 0 };
+        }
+        liveCryptoPrices = prices;
+        applyLivePrices();
+      })
+      .catch(function (e) { console.warn("[Monitor] CoinGecko fetch failed:", e.message); });
+  }
+
+  function fetchLiveForex() {
+    fetch(API_FOREX)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.result !== "success" || !data.rates) return;
+        var r = data.rates;
+        liveForexRates = {};
+        var pairs = [
+          { key: "EURUSD", calc: function () { return +(1 / r.EUR).toFixed(4); } },
+          { key: "GBPUSD", calc: function () { return +(1 / r.GBP).toFixed(4); } },
+          { key: "USDJPY", calc: function () { return r.JPY; } },
+          { key: "USDCNY", calc: function () { return r.CNY; } },
+          { key: "USDINR", calc: function () { return r.INR; } },
+          { key: "USDBRL", calc: function () { return r.BRL; } },
+          { key: "USDRUB", calc: function () { return r.RUB; } },
+          { key: "USDTRY", calc: function () { return r.TRY; } }
+        ];
+        for (var i = 0; i < pairs.length; i++) {
+          liveForexRates[pairs[i].key] = { price: pairs[i].calc(), chg: 0 };
+        }
+        applyLivePrices();
+      })
+      .catch(function (e) { console.warn("[Monitor] Forex API fetch failed:", e.message); });
+  }
+
+  function fetchLiveIndices() {
+    if (!api.fetchIndices) return;
+    api.fetchIndices().then(function (data) {
+      if (!data || !data.quoteResponse || !data.quoteResponse.result) return;
+      var results = data.quoteResponse.result;
+      var indexMap = {};
+      var symMap = { "^GSPC": "S&P500", "^IXIC": "NASDAQ", "^FTSE": "FTSE100", "^N225": "NIKKEI", "000001.SS": "SHCOMP", "^VIX": "VIX", "^TNX": "US10Y" };
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        var sym = symMap[r.symbol] || r.symbol;
+        if (r.regularMarketPrice != null) {
+          indexMap[sym] = { price: r.regularMarketPrice, chg: r.regularMarketChangePercent || 0 };
+        }
+      }
+      for (var i = 0; i < FIN_TICKER.length; i++) {
+        if (indexMap[FIN_TICKER[i].sym]) {
+          var ld = indexMap[FIN_TICKER[i].sym];
+          FIN_TICKER[i].price = ld.price;
+          FIN_TICKER[i].chg = (ld.chg >= 0 ? "+" : "") + ld.chg.toFixed(2) + "%";
+        }
+      }
+      for (var i = 0; i < FIN_STOCKS.length; i++) {
+        if (indexMap[FIN_STOCKS[i].sym]) {
+          FIN_STOCKS[i].price = indexMap[FIN_STOCKS[i].sym].price;
+          FIN_STOCKS[i].chg = indexMap[FIN_STOCKS[i].sym].chg;
+        }
+      }
+      renderFinTicker();
+      if (finRendered) {
+        renderStocksTable();
+        var sd = $("finStockDot");
+        if (sd) sd.style.display = "inline-block";
+      }
+    }).catch(function () {});
+    if (api.fetch2YYield) {
+      api.fetch2YYield().then(function (data) {
+        if (!data || !data.chart || !data.chart.result) return;
+        var meta = data.chart.result[0].meta;
+        if (meta && meta.regularMarketPrice) {
+          var y2 = meta.regularMarketPrice;
+          for (var i = 0; i < FIN_TICKER.length; i++) {
+            if (FIN_TICKER[i].sym === "US2Y") {
+              FIN_TICKER[i].price = y2;
+              FIN_TICKER[i].chg = (meta.regularMarketChangePercent >= 0 ? "+" : "") + meta.regularMarketChangePercent.toFixed(2) + "%";
+            }
+          }
+          for (var i = 0; i < FIN_STOCKS.length; i++) {
+            if (FIN_STOCKS[i].sym === "US2Y") {
+              FIN_STOCKS[i].price = y2;
+              FIN_STOCKS[i].chg = meta.regularMarketChangePercent || 0;
+            }
+          }
+          renderFinTicker();
+          if (finRendered) renderStocksTable();
+        }
+      }).catch(function () {});
+    }
+  }
+
+  function applyLivePrices() {
+    // Update FIN_TICKER with live crypto prices
+    if (liveCryptoPrices) {
+      var cryptoMap = { BTC: true, ETH: true, SOL: true, XRP: true, BNB: true, ADA: true, AVAX: true, MATIC: true };
+      for (var i = 0; i < FIN_TICKER.length; i++) {
+        var sym = FIN_TICKER[i].sym;
+        if (liveCryptoPrices[sym]) {
+          var ld = liveCryptoPrices[sym];
+          FIN_TICKER[i].price = ld.price;
+          FIN_TICKER[i].chg = (ld.chg >= 0 ? "+" : "") + ld.chg.toFixed(2) + "%";
+        }
+        // Gold tracked via tether-gold (XAU)
+        if (sym === "GOLD" && liveCryptoPrices.XAU) {
+          FIN_TICKER[i].price = liveCryptoPrices.XAU.price;
+          FIN_TICKER[i].chg = (liveCryptoPrices.XAU.chg >= 0 ? "+" : "") + liveCryptoPrices.XAU.chg.toFixed(2) + "%";
+        }
+      }
+    }
+    // Update FIN_TICKER with live forex rates
+    if (liveForexRates) {
+      for (var i = 0; i < FIN_TICKER.length; i++) {
+        var sym = FIN_TICKER[i].sym;
+        if (liveForexRates[sym]) {
+          FIN_TICKER[i].price = liveForexRates[sym].price;
+        }
+      }
+    }
+    // Update FIN_CRYPTO table
+    if (liveCryptoPrices) {
+      for (var i = 0; i < FIN_CRYPTO.length; i++) {
+        if (liveCryptoPrices[FIN_CRYPTO[i].sym]) {
+          FIN_CRYPTO[i].price = liveCryptoPrices[FIN_CRYPTO[i].sym].price;
+          FIN_CRYPTO[i].chg = liveCryptoPrices[FIN_CRYPTO[i].sym].chg;
+        }
+      }
+    }
+    // Update FIN_CURRENCIES table
+    if (liveForexRates) {
+      for (var i = 0; i < FIN_CURRENCIES.length; i++) {
+        var sym = FIN_CURRENCIES[i].name.replace("/", "");
+        if (liveForexRates[sym]) FIN_CURRENCIES[i].price = liveForexRates[sym].price;
+      }
+    }
+    // Update Gold in FIN_COMMODITIES
+    if (liveCryptoPrices && liveCryptoPrices.XAU) {
+      for (var i = 0; i < FIN_COMMODITIES.length; i++) {
+        if (FIN_COMMODITIES[i].sym === "XAU") {
+          FIN_COMMODITIES[i].price = liveCryptoPrices.XAU.price;
+          FIN_COMMODITIES[i].chg = liveCryptoPrices.XAU.chg;
+        }
+      }
+    }
+    renderFinTicker();
+    if (finRendered) renderFinanceTables();
+    var ld = $("finLiveDot");
+    if (ld) ld.style.display = "inline-block";
+    var fd = $("finFxDot");
+    if (fd) fd.style.display = "inline-block";
+  }
+
   function startAllLiveData() {
     fetchAircraft();
     fetchEONET();
     fetchISS();
+    fetchLiveCrypto();
+    fetchLiveForex();
+    fetchLiveIndices();
     if (layerGroups.naval) updateNavalLayer();
     if (layerGroups.cyber) updateCyberLayer();
     setInterval(fetchAircraft, 30000);
     setInterval(fetchEONET, 300000);
     setInterval(fetchISS, 10000);
+    setInterval(fetchLiveCrypto, 60000);
+    setInterval(fetchLiveForex, 120000);
+    setInterval(fetchLiveIndices, 120000);
     setInterval(updateNavalLayer, 120000);
     setInterval(updateCyberLayer, 90000);
   }
@@ -951,6 +1133,10 @@ console.log("[Monitor] JS loaded");
   renderFinTicker();
   setInterval(function () {
     for (var i = 0; i < FIN_TICKER.length; i++) {
+      var sym = FIN_TICKER[i].sym;
+      var isLiveCrypto = liveCryptoPrices && (liveCryptoPrices[sym] || (sym === "GOLD" && liveCryptoPrices.XAU));
+      var isLiveForex = liveForexRates && liveForexRates[sym];
+      if (isLiveCrypto || isLiveForex) continue;
       var p = FIN_TICKER[i].price;
       var chg = (Math.random() - 0.48) * (p * 0.003);
       FIN_TICKER[i].price = +(p + chg).toFixed(p > 100 ? 2 : 4);
@@ -958,6 +1144,18 @@ console.log("[Monitor] JS loaded");
       FIN_TICKER[i].chg = (chgPct >= 0 ? "+" : "") + chgPct.toFixed(2) + "%";
     }
     renderFinTicker();
+    for (var s = 0; s < FIN_STOCKS.length; s++) {
+      for (var t = 0; t < FIN_TICKER.length; t++) {
+        if (FIN_TICKER[t].sym === FIN_STOCKS[s].sym) {
+          FIN_STOCKS[s].price = FIN_TICKER[t].price;
+          FIN_STOCKS[s].chg = parseFloat(FIN_TICKER[t].chg) || 0;
+          break;
+        }
+      }
+    }
+    var sd = $("finStockDot");
+    if (sd) sd.style.display = "inline-block";
+    if (finRendered) renderStocksTable();
   }, 2000);
 
   /* ===== STEP 14: SIDEBAR TAB SWITCHING ===== */
@@ -972,7 +1170,7 @@ console.log("[Monitor] JS loaded");
         var content = $("sb" + tab.charAt(0).toUpperCase() + tab.slice(1));
         if (content) content.classList.add("active");
         if (tab === "risk") renderRiskList();
-        if (tab === "finance") renderFinanceTables();
+        if (tab === "finance") { renderFinanceTables(); renderStocksTable(); }
       });
     }
     var collapseBtn = $("sbCollapse");
@@ -1359,6 +1557,34 @@ console.log("[Monitor] JS loaded");
 
   /* ===== STEP 19: FINANCE TABLES ===== */
   var finRendered = false;
+  function renderStocksTable() {
+    try {
+      var el = $("finStocks");
+      if (!el) {
+        var cryptoParent = $("finCrypto");
+        if (!cryptoParent) return;
+        var sec = cryptoParent.closest(".fin-section");
+        if (!sec || !sec.parentNode) return;
+        var div = document.createElement("div");
+        div.className = "fin-section";
+        div.innerHTML = '<div class="fin-sec-title">STOCK INDICES <span class="fin-live-dot" id="finStockDot" style="display:none">◉</span></div><div class="fin-table" id="finStocks"></div>';
+        sec.parentNode.insertBefore(div, sec.nextSibling);
+        el = $("finStocks");
+      }
+      if (!el) return;
+      var html = "";
+      for (var i = 0; i < FIN_STOCKS.length; i++) {
+        var d = FIN_STOCKS[i];
+        if (!d || d.price == null) continue;
+        var cls = d.chg > 0 ? "up" : (d.chg < 0 ? "down" : "");
+        var sign = d.chg > 0 ? "+" : "";
+        html += '<div class="fin-row"><span class="fin-name">' + d.name + '</span><span class="fin-val ' + cls + '">' + d.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4}) + ' <span style="font-size:8px">' + sign + d.chg.toFixed(2) + '%</span></span></div>';
+      }
+      el.innerHTML = html;
+      var dot = $("finStockDot");
+      if (dot) dot.style.display = "inline-block";
+    } catch(e) { console.warn("[Monitor] renderStocksTable:", e); }
+  }
   function renderFinanceTables() {
     function renderTable(id, data, isPct) {
       var el = $(id);
@@ -1420,9 +1646,12 @@ console.log("[Monitor] JS loaded");
     renderYieldTable();
     renderTable("finPrediction", FIN_PREDICTION, true);
     renderTable("finGDP", FIN_GDP, true);
+    renderStocksTable();
   }
+  renderFinanceTables();
+  finRendered = true;
   document.querySelector('.sb-tab[data-tab="finance"]').addEventListener("click", function () {
-    if (!finRendered) { renderFinanceTables(); finRendered = true; }
+    renderFinanceTables();
   });
 
   /* ===== INFRA TAB RENDERING ===== */

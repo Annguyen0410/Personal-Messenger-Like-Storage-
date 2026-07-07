@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src https://earthquake.usgs.gov https://*.basemaps.cartocdn.com https://unpkg.com https://opensky-network.org https://eonet.gsfc.nasa.gov https://api.wheretheiss.at;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src https://earthquake.usgs.gov https://*.basemaps.cartocdn.com https://unpkg.com https://opensky-network.org https://eonet.gsfc.nasa.gov https://api.wheretheiss.at https://api.coingecko.com https://open.er-api.com;">
   <title>World Monitor</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="monitor.css">
@@ -92,15 +92,19 @@
       <!-- FINANCE TAB -->
       <div class="sb-content" id="sbFinance">
         <div class="fin-section">
-          <div class="fin-sec-title">CRYPTOCURRENCY</div>
+          <div class="fin-sec-title">CRYPTOCURRENCY <span class="fin-live-dot" id="finLiveDot" style="display:none">◉</span></div>
           <div class="fin-table" id="finCrypto"></div>
+        </div>
+        <div class="fin-section">
+          <div class="fin-sec-title">STOCK INDICES <span class="fin-live-dot" id="finStockDot" style="display:none">◉</span></div>
+          <div class="fin-table" id="finStocks"></div>
         </div>
         <div class="fin-section">
           <div class="fin-sec-title">COMMODITIES</div>
           <div class="fin-table" id="finCommodities"></div>
         </div>
         <div class="fin-section">
-          <div class="fin-sec-title">CURRENCIES</div>
+          <div class="fin-sec-title">CURRENCIES <span class="fin-live-dot" id="finFxDot" style="display:none">◉</span></div>
           <div class="fin-table" id="finCurrencies"></div>
         </div>
         <div class="fin-section">

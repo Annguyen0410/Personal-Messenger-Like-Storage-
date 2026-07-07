@@ -1,1 +1,0 @@
-Electron ^43 with `contextIsolation: true` / `nodeIntegration: false` / `sandbox: false`; `electron-builder` ^26 for NSIS installer and portable builds; native `protocol.registerSchemesAsPrivileged` for a streaming `local-file://` scheme; MediaRecorder API for webm voice notes; Canvas 2D for the whiteboard.

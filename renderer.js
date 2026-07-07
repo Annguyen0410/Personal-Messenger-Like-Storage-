@@ -50,6 +50,7 @@
       ["ctxMenu", "reactionPicker", "emojiPicker", "themePicker", "editModal"].forEach(id => {
         const el = $(id); if (el) el.hidden = true;
       });
+      document.querySelectorAll(".msg-row.actions-visible").forEach(r => r.classList.remove("actions-visible"));
     }
     document.addEventListener("click", closeAll);
 
@@ -131,6 +132,16 @@
         for (const file of (msg.files || [])) bubble.append(buildFile(file));
       }
       inner.append(bubble);
+
+      /* Click on message bubble toggles action buttons */
+      bubble.addEventListener("click", function (e) {
+        if (e.target.closest(".msg-hover-btn")) return;
+        e.stopPropagation();
+        document.querySelectorAll(".msg-row.actions-visible").forEach(function (r) {
+          if (r !== row) r.classList.remove("actions-visible");
+        });
+        row.classList.toggle("actions-visible");
+      });
 
       /* Reactions */
       if (msg.reactions && Object.keys(msg.reactions).length) {
